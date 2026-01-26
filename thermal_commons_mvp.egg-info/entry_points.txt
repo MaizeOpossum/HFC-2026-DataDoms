@@ -1,0 +1,4 @@
+[console_scripts]
+cool-api = thermal_commons_mvp.api.main:main
+cool-dash = thermal_commons_mvp.dashboard.app:run_dashboard
+cool-sim = thermal_commons_mvp.simulation.city_gym:main

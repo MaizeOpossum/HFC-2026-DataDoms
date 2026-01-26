@@ -67,7 +67,9 @@ class BAC0Driver(BACnetDriver):
             logger.warning("BAC0 not installed; driver is no-op.")
             return
         try:
-            self._bacnet = BAC0.lite(ip=self._ip, port=self._port, objectName=self._name)
+            # BAC0 2025+ uses ip="x.x.x.x/mask" and has no objectName. Prefer /24 if only IP given.
+            ip_spec = f"{self._ip}/24" if "/" not in str(self._ip) else str(self._ip)
+            self._bacnet = BAC0.lite(ip=ip_spec, port=self._port)
             logger.info("BACnet driver connected to %s:%s", self._ip, self._port)
         except Exception as e:
             logger.error("BACnet connect failed: %s", e)

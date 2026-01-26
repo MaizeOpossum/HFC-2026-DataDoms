@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "thermal-commons-mvp"
-version = "1.0.0-MVP"
+version = "1.0.0a0"
 description = "COOL - Cooperative Optimisation of Urban Loads: decentralised agentic cooling swarm for Singapore commercial buildings."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,8 +15,6 @@ keywords = ["energy", "bacnet", "citylearn", "marl", "streamlit"]
 dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
-    "citylearn>=2.0",
-    "gymnasium>=0.29",
     "bac0>=23.0",
     "fastapi>=0.104",
     "uvicorn[standard]>=0.24",
@@ -27,6 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# CityLearn pulls gymnasium<=0.28 and older deps; use a separate venv if you need it.
+simulation = [
+    "citylearn>=2.0",
+]
 agents = [
     "ray[rllib]>=2.7",
 ]

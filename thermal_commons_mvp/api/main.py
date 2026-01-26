@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from thermal_commons_mvp.api.dependencies import get_driver, get_order_book, get_trade_execution
@@ -40,6 +40,12 @@ app.include_router(market.router, prefix="/market", tags=["market"])
 @app.get("/health")
 def health() -> dict[str, Any]:
     return {"status": "ok", "service": "COOL API"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> Response:
+    """Avoid browser 404 for automatic favicon requests."""
+    return Response(status_code=204)
 
 
 def main() -> None:

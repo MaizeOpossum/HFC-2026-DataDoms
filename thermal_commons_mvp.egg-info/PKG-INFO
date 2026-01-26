@@ -1,3 +1,31 @@
+Metadata-Version: 2.4
+Name: thermal-commons-mvp
+Version: 1.0.0a0
+Summary: COOL - Cooperative Optimisation of Urban Loads: decentralised agentic cooling swarm for Singapore commercial buildings.
+Author: DataDoms HFC
+License: MIT
+Keywords: energy,bacnet,citylearn,marl,streamlit
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pydantic-settings>=2.0
+Requires-Dist: bac0>=23.0
+Requires-Dist: fastapi>=0.104
+Requires-Dist: uvicorn[standard]>=0.24
+Requires-Dist: streamlit>=1.28
+Requires-Dist: pydeck>=0.8
+Requires-Dist: pandas>=2.0
+Requires-Dist: structlog>=23.0
+Provides-Extra: simulation
+Requires-Dist: citylearn>=2.0; extra == "simulation"
+Provides-Extra: agents
+Requires-Dist: ray[rllib]>=2.7; extra == "agents"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21; extra == "dev"
+Requires-Dist: ruff>=0.1; extra == "dev"
+Requires-Dist: mypy>=1.5; extra == "dev"
+
 # COOL — Cooperative Optimisation of Urban Loads
 
 **Mission:** Deploy a decentralised agentic cooling swarm for Singapore commercial buildings.  

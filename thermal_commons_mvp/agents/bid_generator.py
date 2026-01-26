@@ -1,6 +1,6 @@
 """BidGenerator: willingness to shed load vs. comfort cost -> Bid/Ask."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid
 

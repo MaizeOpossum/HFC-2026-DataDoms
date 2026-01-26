@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thermal-commons-mvp"
+version = "1.0.0-MVP"
+description = "COOL - Cooperative Optimisation of Urban Loads: decentralised agentic cooling swarm for Singapore commercial buildings."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "DataDoms HFC" }]
+keywords = ["energy", "bacnet", "citylearn", "marl", "streamlit"]
+
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "citylearn>=2.0",
+    "gymnasium>=0.29",
+    "bac0>=23.0",
+    "fastapi>=0.104",
+    "uvicorn[standard]>=0.24",
+    "streamlit>=1.28",
+    "pydeck>=0.8",
+    "pandas>=2.0",
+    "structlog>=23.0",
+]
+
+[project.optional-dependencies]
+agents = [
+    "ray[rllib]>=2.7",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "ruff>=0.1",
+    "mypy>=1.5",
+]
+
+[project.scripts]
+cool-sim = "thermal_commons_mvp.simulation.city_gym:main"
+cool-api = "thermal_commons_mvp.api.main:main"
+cool-dash = "thermal_commons_mvp.dashboard.app:run_dashboard"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["thermal_commons_mvp*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

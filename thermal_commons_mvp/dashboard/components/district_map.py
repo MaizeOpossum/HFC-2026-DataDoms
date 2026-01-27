@@ -118,16 +118,8 @@ def render_district_map(
         st.warning("PyDeck not installed. Install with: pip install pydeck")
         return
 
-    # Check if token is available (Streamlit reads from .streamlit/config.toml)
-    # Also check environment as fallback
-    mapbox_token = _MAPBOX_TOKEN or os.getenv("MAPBOX_ACCESS_TOKEN")
-    
-    # Streamlit automatically reads from .streamlit/config.toml [mapbox] token
-    # So even if env var isn't set, Streamlit should have it
-    token_status = "✅ Mapbox token configured (check .streamlit/config.toml if map doesn't show)"
-    
-    if not mapbox_token:
-        token_status = "⚠️ Token not in env - ensure it's in .streamlit/config.toml"
+    # Ensure token is available via environment/settings; assume it's configured correctly
+    _ = _MAPBOX_TOKEN or os.getenv("MAPBOX_ACCESS_TOKEN")
 
     building_ids = list(SINGAPORE_BUILDING_LOCATIONS.keys())
     if not building_ids:
@@ -211,17 +203,9 @@ def render_district_map(
             map_style=selected_style,
             tooltip=tooltip,
         )
-        st.caption(token_status)
         st.pydeck_chart(deck)
     except Exception as e:
         st.error(f"❌ Map rendering error: {str(e)}")
-        st.info("""
-        **Troubleshooting:**
-        1. Ensure `.streamlit/config.toml` exists with `[mapbox] token = "your_token"`
-        2. **Restart Streamlit** after creating/editing config.toml
-        3. Check browser console (F12) for JavaScript errors
-        4. Try selecting "Light (no token)" style as a fallback
-        """)
         # Try fallback
         try:
             deck = pdk.Deck(
@@ -231,30 +215,9 @@ def render_district_map(
                 tooltip=tooltip,
             )
             st.pydeck_chart(deck)
-            st.caption("Using fallback 'light' style")
         except Exception as e2:
             st.error(f"Fallback also failed: {e2}")
     
-    # Note about Mapbox API key if map doesn't show
-    with st.expander("ℹ️ Map not showing or only black/white?"):
-        st.markdown("""
-        **Streamlit requires the Mapbox token in `.streamlit/config.toml`, not just `.env`!**
-        
-        The token has been added to `.streamlit/config.toml`. If the map still doesn't show:
-        
-        1. **Restart Streamlit** (the config file is read at startup)
-        2. Check that `.streamlit/config.toml` exists with:
-           ```toml
-           [mapbox]
-           token = "pk.your_token_here"
-           ```
-        3. Verify your token is valid at: https://account.mapbox.com/access-tokens/
-        4. If using satellite styles, ensure your token has the right permissions
-        
-        **Note:** Streamlit's `st.pydeck_chart()` reads the token from `.streamlit/config.toml`, 
-        not from environment variables or `.env` files.
-        """)
-
     # Close container
     st.markdown("</div>", unsafe_allow_html=True)
     

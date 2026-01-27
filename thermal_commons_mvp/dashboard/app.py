@@ -56,18 +56,19 @@ def live_simulation():
         render_time_series_chart(
             history=sim.get("history"),
         )
-    
-    # Trade log section
+
+    # Singapore district map: buildings colored by temperature / power / grid stress
+    # Place immediately under the main data (carbon + charts)
+    render_district_map(
+        telemetry_by_building=sim.get("telemetry"),
+        grid_stress=sim.get("grid_stress"),
+    )
+
+    # Trade log section (now below the map)
     render_trade_log(
         trades=sim.get("trades"),
         bid_to_building=sim.get("bid_to_building", {}),
         ask_to_building=sim.get("ask_to_building", {}),
-    )
-
-    # Singapore district map: buildings colored by temperature / power / grid stress
-    render_district_map(
-        telemetry_by_building=sim.get("telemetry"),
-        grid_stress=sim.get("grid_stress"),
     )
 
 

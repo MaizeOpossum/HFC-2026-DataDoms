@@ -1,6 +1,8 @@
 # Streamlit configuration for COOL dashboard
 
-[mapbox]
-# Mapbox access token for PyDeck maps
-# Get your token at: https://account.mapbox.com/access-tokens/
-token = "pk.eyJ1IjoibWFpemVvcG9zc3VtIiwiYSI6ImNta3ZjeWFsNTA1ZGIza3EwMnJ5MGM1bWcifQ.xniuLKle1AxAMAgRJUXvkg"
+[server]
+# On macOS + newer Python versions, watchdog's FSEvents backend can fail with:
+# "Cannot start fsevents stream. Use a kqueue or polling observer instead."
+# Polling is more stable and avoids the blank/half-loaded UI that can result
+# from file-watcher crashes during app startup/reruns.
+fileWatcherType = "poll"

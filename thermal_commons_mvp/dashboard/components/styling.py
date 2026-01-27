@@ -156,34 +156,27 @@ def inject_custom_css() -> None:
         background: transparent !important;
     }
     
-    /* Hide empty padding boxes by matching background */
+    /* Main content container background */
     .main .block-container {
         background: transparent !important;
     }
     
-    /* Hide empty Streamlit containers - make them transparent */
-    div[data-testid="stVerticalBlock"]:empty,
-    div[data-testid="stVerticalBlock"]:has(> div:empty),
-    div[data-testid="stVerticalBlock"]:has(> *:empty:not(script):not(style):not(div)) {
+    /* Remove visible outlines / fill for top-level padding boxes while keeping inner cards */
+    .main .block-container > div {
         background: transparent !important;
         border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Tidy up genuinely empty layout padding boxes without touching real content */
+    section[data-testid="stVerticalBlock"]:empty,
+    div[data-testid="stVerticalBlock"]:empty,
+    [data-testid="column"]:empty {
         padding: 0 !important;
         margin: 0 !important;
-        min-height: 0 !important;
-        height: 0 !important;
-        display: none !important;
-    }
-    
-    /* Hide empty element containers */
-    .element-container:empty {
-        display: none !important;
-    }
-    
-    /* Make columns with only empty content invisible */
-    [data-testid="column"]:has(> div:empty),
-    [data-testid="column"]:has(> *:empty:not(script):not(style)) {
-        background: transparent !important;
         border: none !important;
+        background: transparent !important;
+        min-height: 0 !important;
     }
     
     /* Scrollbar styling */
@@ -220,21 +213,25 @@ def inject_custom_css() -> None:
         box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
     }
     
-    /* Chart containers - Dark galaxy */
-    .element-container {
-        background: rgba(15, 15, 30, 0.8) !important;
-        border-radius: 12px !important;
-        padding: 1rem !important;
-        margin-bottom: 1rem !important;
-        border: 1px solid rgba(139, 92, 246, 0.2) !important;
-        box-shadow: 0 0 30px rgba(139, 92, 246, 0.1) !important;
+    /* Absolutely disable any card styling on Streamlit's automatic element wrappers.
+       This removes all "skeleton" boxes, even when those wrappers contain layout divs. */
+    .element-container,
+    div[data-testid="stElementContainer"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
-    
-    /* PyDeck map container */
-    [data-testid="stPydeckChart"] {
-        border-radius: 12px !important;
-        overflow: hidden !important;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+
+    /* Also ensure bare markdown wrappers never appear as empty cards/skeletons */
+    .stMarkdown,
+    div[data-testid="stMarkdown"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     
     /* Table styling */
@@ -257,79 +254,6 @@ def inject_custom_css() -> None:
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    
-    /* AGGRESSIVELY REMOVE ALL PADDING BOXES - COMPLETE REMOVAL */
-    .main .block-container > div:first-child,
-    .main .block-container > div:empty,
-    .main .block-container > div:not(:has(*)) {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    /* Remove ALL empty Streamlit containers */
-    section[data-testid="stVerticalBlock"]:empty,
-    section[data-testid="stVerticalBlock"]:first-child:empty,
-    div[data-testid="stVerticalBlock"]:empty,
-    div[data-testid="stVerticalBlock"]:has(> *:empty),
-    div[data-testid="stVerticalBlock"]:not(:has(*:not(script):not(style))) {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    /* Remove empty element containers */
-    .element-container:empty,
-    .element-container:has(> *:empty),
-    .element-container:not(:has(*:not(script):not(style))) {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    /* Remove empty columns completely */
-    [data-testid="column"]:empty,
-    [data-testid="column"]:has(> *:empty),
-    [data-testid="column"]:not(:has(*:not(script):not(style))) {
-        display: none !important;
-        visibility: hidden !important;
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    /* Remove any div with only whitespace or empty content */
-    div:empty,
-    div:has(> *:empty:not(script):not(style):not(link)) {
-        display: none !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    
-    /* Force remove padding from main container */
-    .main .block-container {
-        padding-top: 0 !important;
-    }
-    
-    /* Remove top spacing */
-    .main .block-container > *:first-child:empty {
-        display: none !important;
-    }
     
     /* Custom animations */
     @keyframes fadeIn {
@@ -404,15 +328,6 @@ def inject_custom_css() -> None:
         background-color: var(--bg-card) !important;
     }
     
-    /* Chart containers with glassmorphism */
-    [data-testid="stVerticalBlock"] > [style*="flex"] {
-        background: rgba(26, 31, 58, 0.4) !important;
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-    }
-    
     /* Compact metrics - reduce padding */
     [data-testid="stMetric"] {
         padding: 0.5rem !important;
@@ -485,39 +400,6 @@ def inject_custom_js() -> None:
             }
         `;
         document.head.appendChild(style);
-        
-        // AGGRESSIVELY REMOVE ALL EMPTY PADDING BOXES
-        function removeEmptyBoxes() {
-            // Remove empty divs
-            document.querySelectorAll('div').forEach(div => {
-                if (div.children.length === 0 && div.textContent.trim() === '') {
-                    div.style.display = 'none';
-                    div.style.height = '0';
-                    div.style.padding = '0';
-                    div.style.margin = '0';
-                }
-            });
-            
-            // Remove empty sections
-            document.querySelectorAll('section[data-testid="stVerticalBlock"]').forEach(section => {
-                if (section.children.length === 0 || (section.textContent.trim() === '' && section.querySelectorAll('*').length === 0)) {
-                    section.style.display = 'none';
-                    section.style.height = '0';
-                }
-            });
-            
-            // Remove empty columns
-            document.querySelectorAll('[data-testid="column"]').forEach(col => {
-                if (col.children.length === 0 || col.textContent.trim() === '') {
-                    col.style.display = 'none';
-                }
-            });
-        }
-        
-        // Run immediately and on mutations
-        removeEmptyBoxes();
-        const observer = new MutationObserver(removeEmptyBoxes);
-        observer.observe(document.body, { childList: true, subtree: true });
         
         // Add glow effect to metrics on update
         const observer = new MutationObserver(function(mutations) {

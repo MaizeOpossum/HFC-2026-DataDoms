@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+from thermal_commons_mvp.agents.bid_generator import BidGenerator
 from thermal_commons_mvp.agents.market_maker import MarketMakerAgent
 from thermal_commons_mvp.market.order_book import OrderBook
 from thermal_commons_mvp.models.bids import Ask, Bid
@@ -12,7 +13,8 @@ from thermal_commons_mvp.models.telemetry import Telemetry
 from thermal_commons_mvp.models.trades import Trade
 from thermal_commons_mvp.simulation.grid_stress import GridStressGenerator
 
-BUILDING_IDS = ["Building_A", "Building_B", "Building_C"]
+# Generate 50 building IDs: Building_01 through Building_50
+BUILDING_IDS = [f"Building_{i:02d}" for i in range(1, 51)]
 GRID_CYCLE_MINUTES = 4  # short cycle so stress changes visible in demo
 
 
@@ -65,7 +67,7 @@ def _match_orders(book: OrderBook) -> List[Trade]:
 
 
 def make_initial_state() -> Dict[str, Any]:
-    """State dict for st.session_state: telemetry, book, trades, carbon, grid, step."""
+    """State dict for st.session_state: telemetry, book, trades, carbon, grid, step, history."""
     return {
         "telemetry": {b: _random_telemetry(b, 0) for b in BUILDING_IDS},
         "order_book": OrderBook(),
@@ -74,7 +76,17 @@ def make_initial_state() -> Dict[str, Any]:
         "grid_stress": "low",
         "step_count": 0,
         "grid_gen": GridStressGenerator(cycle_minutes=GRID_CYCLE_MINUTES),
-        "agents": {b: MarketMakerAgent(b) for b in BUILDING_IDS},
+        "agents": {
+            b: MarketMakerAgent(
+                b,
+                bid_generator=BidGenerator(building_id=b, use_ai=True)
+            )
+            for b in BUILDING_IDS
+        },
+        "history": [],  # Store historical data for time series
+        "max_history": 100,  # Keep last 100 steps
+        "bid_to_building": {},  # Mapping bid_id -> building_id
+        "ask_to_building": {},  # Mapping ask_id -> building_id
     }
 
 
@@ -89,7 +101,13 @@ def step(state: Dict[str, Any]) -> None:
 
     agents = state.get("agents")
     if agents is None:
-        state["agents"] = {b: MarketMakerAgent(b) for b in BUILDING_IDS}
+        state["agents"] = {
+            b: MarketMakerAgent(
+                b,
+                bid_generator=BidGenerator(building_id=b, use_ai=True)
+            )
+            for b in BUILDING_IDS
+        }
         agents = state["agents"]
 
     # Fresh book each step so we only match this tick’s orders
@@ -97,14 +115,46 @@ def step(state: Dict[str, Any]) -> None:
     state["order_book"] = book
     telemetry: Dict[str, Telemetry] = {}
 
+    # Pass trade history to agents for AI learning
+    recent_trades = state.get("trades", [])[-20:]  # Last 20 trades for context
+    ai_reasoning: Dict[str, str] = {}
+    
+    # Track bid_id/ask_id -> building_id mapping for trade display
+    bid_to_building: Dict[str, str] = state.get("bid_to_building", {})
+    ask_to_building: Dict[str, str] = state.get("ask_to_building", {})
+    
     for b in BUILDING_IDS:
         t = _random_telemetry(b, step_n)
         telemetry[b] = t
-        bid_order, ask_order = agents[b].submit_orders(t, grid_signal)
+        bid_order, ask_order = agents[b].submit_orders(t, grid_signal, trade_history=recent_trades)
         book.add_bid(bid_order)
         book.add_ask(ask_order)
+        # Store mapping for trade display
+        bid_to_building[bid_order.id] = bid_order.building_id
+        ask_to_building[ask_order.id] = ask_order.building_id
+        # Capture AI reasoning
+        reasoning = agents[b].get_ai_reasoning()
+        if reasoning:
+            ai_reasoning[b] = reasoning
+    
+    # Store mappings in state
+    state["bid_to_building"] = bid_to_building
+    state["ask_to_building"] = ask_to_building
+    state["ai_reasoning"] = ai_reasoning
 
     state["telemetry"] = telemetry
     new_trades = _match_orders(book)
     state["trades"] = state.get("trades", []) + new_trades
     state["total_kwh_saved"] = state.get("total_kwh_saved", 0.0) + sum(t.quantity_kwh for t in new_trades)
+    
+    # Store historical snapshot for time series
+    history = state.get("history", [])
+    history.append({
+        "step": step_n,
+        "timestamp": datetime.now(timezone.utc),
+        "telemetry": telemetry,
+        "grid_stress": grid_signal.level,
+    })
+    # Keep only last N steps
+    max_history = state.get("max_history", 100)
+    state["history"] = history[-max_history:]

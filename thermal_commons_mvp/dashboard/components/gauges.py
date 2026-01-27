@@ -17,17 +17,25 @@ def _sample_telemetry() -> dict:
 def render_gauges(
     telemetry_by_building: Optional[Dict[str, object]] = None,
     grid_stress: Optional[str] = None,
+    ai_reasoning: Optional[Dict[str, str]] = None,
 ) -> None:
     """Render live gauges. If telemetry_by_building is provided, show per-building and grid stress."""
-    st.subheader("Live Gauges")
+    st.subheader("Live Gauges & AI Decisions")
     if telemetry_by_building and len(telemetry_by_building) > 0:
-        for building_id, t in telemetry_by_building.items():
-            with st.expander(f"🏢 {building_id}", expanded=(building_id == list(telemetry_by_building)[0])):
+        # Show first 3 buildings expanded, rest collapsed
+        building_list = list(telemetry_by_building.items())
+        for idx, (building_id, t) in enumerate(building_list):
+            expanded = idx < 3
+            with st.expander(f"🤖 {building_id} — AI Agent", expanded=expanded):
                 row = st.columns(4)
                 row[0].metric("Temperature (°C)", f"{getattr(t, 'temp_c', 0):.1f}")
                 row[1].metric("Humidity (%)", f"{getattr(t, 'humidity_pct', 0):.0f}")
                 row[2].metric("Power (kW)", f"{getattr(t, 'power_load_kw', 0):.1f}")
                 row[3].metric("Grid stress", grid_stress or "—")
+                
+                # Show AI reasoning if available
+                if ai_reasoning and building_id in ai_reasoning:
+                    st.info(f"**AI Decision:** {ai_reasoning[building_id]}")
     else:
         d = _sample_telemetry()
         c1, c2, c3, c4 = st.columns(4)

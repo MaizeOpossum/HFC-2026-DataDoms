@@ -34,11 +34,16 @@ class MarketMakerAgent(BaseAgent):
         self,
         telemetry: Telemetry,
         grid_signal: Optional[GridStressSignal] = None,
+        trade_history: Optional[list] = None,
     ) -> tuple[Bid | None, Ask | None]:
         """
-        Generate and return a bid and ask for the current state.
+        Generate and return a bid and ask using AI decision-making.
         Caller (or TradeExecution) is responsible for submitting to the book.
         """
-        bid = self._bid_gen.generate_bid(telemetry, grid_signal)
-        ask = self._bid_gen.generate_ask(telemetry, grid_signal)
+        bid = self._bid_gen.generate_bid(telemetry, grid_signal, trade_history=trade_history)
+        ask = self._bid_gen.generate_ask(telemetry, grid_signal, trade_history=trade_history)
         return (bid, ask)
+    
+    def get_ai_reasoning(self) -> Optional[str]:
+        """Get the AI's reasoning for the last decision."""
+        return self._bid_gen.get_last_reasoning() if hasattr(self._bid_gen, "get_last_reasoning") else None

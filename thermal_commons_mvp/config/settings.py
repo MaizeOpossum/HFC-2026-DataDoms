@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Carbon (Singapore grid example, kg CO2 per kWh)
     carbon_factor_kg_per_kwh: float = 0.4083
 
+    # Mapbox (reads from MAPBOX_ACCESS_TOKEN env var)
+    mapbox_access_token: Optional[str] = None
+
 
 @lru_cache
 def get_settings() -> Settings:

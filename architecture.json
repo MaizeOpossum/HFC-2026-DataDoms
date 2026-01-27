@@ -1,0 +1,81 @@
+{
+    "project_manifest": {
+        "name": "COOL - Cooperative Optimisation of Urban Loads",
+        "version": "1.0.0-MVP",
+        "mission": "Deploy decentralized agentic cooling swarm for Singapore commercial buildings.",
+        "target_metric": "Maximize Carbon ROI via Inter-Building Energy Trading"
+    },
+    "architecture_blueprint": {
+        "layer_1_edge": {
+            "role": "Physical/Simulated Interface",
+            "component": "BMS Connector",
+            "protocol": "BACnet/IP",
+            "tool": "BAC0 (Python)"
+        },
+        "layer_2_swarm": {
+            "role": "Intelligence & Negotiation",
+            "component": "Agent Grid",
+            "logic": "Multi-Agent Reinforcement Learning (MARL)",
+            "tool": "Ray RLlib / CityLearn"
+        },
+        "layer_3_command": {
+            "role": "Visualization & Audit",
+            "component": "The Market Dashboard",
+            "framework": "Streamlit",
+            "update_rate": "Real-time"
+        }
+    },
+    "tech_stack_selection": {
+        "language": "Python 3.10+",
+        "simulation_engine": "CityLearn (OpenAI Gym env for grid interaction)",
+        "protocol_wrapper": "BAC0 (BACnet/IP communication)",
+        "agent_framework": "Ray RLlib (Scalable PPO/DQN implementation)",
+        "backend_api": "FastAPI (Async handling of sensor streams)",
+        "frontend_ui": "Streamlit (Rapid MVP dashboarding)"
+    },
+    "development_roadmap": {
+        "stream_a_simulation": {
+            "owner": "Data Engineer",
+            "objective": "Mock the physical world",
+            "tasks": [
+                "Initialize CityLearn environment with 'Building_5' dataset (tropical preset).",
+                "Expose step() function to return [temp, humidity, power_load].",
+                "Implement 'Grid Stress' signal generator (mock demand response events)."
+            ]
+        },
+        "stream_b_agent_logic": {
+            "owner": "AI Engineer",
+            "objective": "Enable negotiation",
+            "tasks": [
+                "Develop 'RbcAgent' (Rule-Based Control) for baseline stability.",
+                "Implement 'BidGenerator': Calculate willingness to shed load vs. comfort cost.",
+                "Implement 'TradeExecution': Simple order matching engine (asyncio.Queue)."
+            ]
+        },
+        "stream_c_dashboard": {
+            "owner": "Frontend Dev",
+            "objective": "Visualize impact for judges",
+            "tasks": [
+                "Build Streamlit layout: Left Col (Live Gauges), Right Col (Trade Log).",
+                "Create 'Carbon Counter' component: Aggregating real-time savings.",
+                "Integrate 3D Map visual (using PyDeck) for district visualization."
+            ]
+        }
+    },
+    "code_scaffold": {
+        "root": "thermal_commons_mvp",
+        "structure": [
+            "agents/base_agent.py",
+            "agents/market_maker.py",
+            "interface/bacnet_driver.py",
+            "simulation/city_gym.py",
+            "dashboard/app.py",
+            "utils/carbon_calculator.py"
+        ]
+    },
+    "key_differentiators": [
+        "Uses industry-standard BACnet protocol (Feasibility).",
+        "Leverages CityLearn for scientifically valid energy modelling (Impact).",
+        "Demonstrates emergent behavior via autonomous bidding (True Agentic AI)."
+    ]
+}

@@ -1,0 +1,6 @@
+# Streamlit configuration for COOL dashboard
+
+[mapbox]
+# Mapbox access token for PyDeck maps
+# Get your token at: https://account.mapbox.com/access-tokens/
+token = "pk.eyJ1IjoibWFpemVvcG9zc3VtIiwiYSI6ImNta3ZjeWFsNTA1ZGIza3EwMnJ5MGM1bWcifQ.xniuLKle1AxAMAgRJUXvkg"

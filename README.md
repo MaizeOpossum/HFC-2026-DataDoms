@@ -1,5 +1,7 @@
 # COOL — Cooperative Optimisation of Urban Loads
 
+> 📘 **First time here?** See **[SETUP_GUIDE.md](SETUP_GUIDE.md)** for step-by-step setup instructions!
+
 **Mission:** Deploy a decentralised agentic cooling swarm for Singapore commercial buildings.  
 **Target metric:** Maximise Carbon ROI via inter-building energy trading.
 
@@ -24,14 +26,34 @@ tests/
 └── integration/
 ```
 
-## Setup
+## 🚀 Quick Start
+
+**New to this project?** Check out the **[SETUP_GUIDE.md](SETUP_GUIDE.md)** for a comprehensive step-by-step tutorial.
+
+### Quick Setup (Experienced Users)
 
 Requires **Python 3.10+**.
 
 ```bash
-# From project root
-pip install -e ".[dev]"
-cp .env.example .env   # edit as needed
+# 1. Clone and enter directory
+git clone <repo-url>
+cd "DataDoms HFC"
+
+# 2. Create virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 3. Install dependencies
+pip install -e .
+
+# 4. Configure environment
+cp .env.example .env   # edit as needed (defaults work fine)
+
+# 5. Launch dashboard
+streamlit run thermal_commons_mvp/dashboard/app.py
+# Or: cool-dash
+
+# 6. Open browser to http://localhost:8501
 ```
 
 **Optional — CityLearn simulation:** The default install runs the sim in **mock mode** (no CityLearn). For real CityLearn environments, use a **separate virtualenv** and `pip install -e ".[simulation]"` there, since CityLearn pins older gymnasium/pandas.

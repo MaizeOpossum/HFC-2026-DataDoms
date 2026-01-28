@@ -7,15 +7,18 @@ from typing import Any, Dict, List
 
 from thermal_commons_mvp.agents.bid_generator import BidGenerator
 from thermal_commons_mvp.agents.market_maker import MarketMakerAgent
+from thermal_commons_mvp.config import get_settings
 from thermal_commons_mvp.market.order_book import OrderBook
 from thermal_commons_mvp.models.bids import Ask, Bid
 from thermal_commons_mvp.models.telemetry import Telemetry
 from thermal_commons_mvp.models.trades import Trade
+from thermal_commons_mvp.persistence.database import StateDatabase
 from thermal_commons_mvp.simulation.grid_stress import GridStressGenerator
+
+from thermal_commons_mvp.dashboard.event_bus import get_event_bus, TRADE_EXECUTED
 
 # Generate 50 building IDs: Building_01 through Building_50
 BUILDING_IDS = [f"Building_{i:02d}" for i in range(1, 51)]
-GRID_CYCLE_MINUTES = 4  # short cycle so stress changes visible in demo
 
 
 def _random_telemetry(building_id: str, step: int) -> Telemetry:
@@ -37,19 +40,32 @@ def _random_telemetry(building_id: str, step: int) -> Telemetry:
 
 
 def _match_orders(book: OrderBook) -> List[Trade]:
-    """Match best bid vs best ask (different buildings); return new trades."""
+    """Match best bid vs best ask (different buildings); return new trades with partial fill support."""
     trades: List[Trade] = []
     bids = sorted(book.open_bids(), key=lambda b: b.price_per_kwh, reverse=True)
     asks = sorted(book.open_asks(), key=lambda a: a.price_per_kwh)
+    
+    # Track which orders we've already processed to avoid double-matching
+    processed_bid_ids = set()
+    processed_ask_ids = set()
+    
     for bid in bids:
+        if bid.id in processed_bid_ids:
+            continue
+            
         for ask in asks:
+            if ask.id in processed_ask_ids:
+                continue
+                
             if bid.building_id == ask.building_id:
                 continue
             if bid.price_per_kwh < ask.price_per_kwh:
                 continue
+                
             qty = min(bid.quantity_kwh, ask.quantity_kwh)
             if qty <= 0:
                 continue
+                
             trade = Trade(
                 id=f"trade-{uuid.uuid4().hex[:8]}",
                 bid_id=bid.id,
@@ -59,23 +75,57 @@ def _match_orders(book: OrderBook) -> List[Trade]:
                 executed_at=datetime.now(timezone.utc),
             )
             trades.append(trade)
-            book.remove_bid(bid.id)
-            book.remove_ask(ask.id)
-            asks = [a for a in asks if a.id != ask.id]
+            
+            # Update quantities for partial fills
+            remaining_bid_qty = bid.quantity_kwh - qty
+            remaining_ask_qty = ask.quantity_kwh - qty
+            
+            if remaining_bid_qty <= 0:
+                book.remove_bid(bid.id)
+                processed_bid_ids.add(bid.id)
+            else:
+                book.update_bid_quantity(bid.id, remaining_bid_qty)
+                processed_bid_ids.add(bid.id)
+            
+            if remaining_ask_qty <= 0:
+                book.remove_ask(ask.id)
+                processed_ask_ids.add(ask.id)
+            else:
+                book.update_ask_quantity(ask.id, remaining_ask_qty)
+                processed_ask_ids.add(ask.id)
+            
+            # Update asks list to reflect changes
+            asks = book.open_asks()
             break
     return trades
 
 
 def make_initial_state() -> Dict[str, Any]:
     """State dict for st.session_state: telemetry, book, trades, carbon, grid, step, history."""
+    settings = get_settings()
+    
+    # Initialize database if persistence is enabled
+    db = None
+    if settings.enable_persistence:
+        from pathlib import Path
+        db_path = Path(settings.db_path) if settings.db_path else None
+        db = StateDatabase(db_path=db_path)
+        
+        # Try to load recent trades and history
+        recent_trades = db.get_trades(limit=1000)
+        recent_history = db.get_recent_history(limit=100)
+    else:
+        recent_trades = []
+        recent_history = []
+    
     return {
         "telemetry": {b: _random_telemetry(b, 0) for b in BUILDING_IDS},
         "order_book": OrderBook(),
-        "trades": [],
-        "total_kwh_saved": 0.0,
+        "trades": recent_trades,
+        "total_kwh_saved": sum(t.quantity_kwh for t in recent_trades) if recent_trades else 0.0,
         "grid_stress": "low",
-        "step_count": 0,
-        "grid_gen": GridStressGenerator(cycle_minutes=GRID_CYCLE_MINUTES),
+        "step_count": recent_history[-1]["step"] if recent_history else 0,
+        "grid_gen": GridStressGenerator(cycle_minutes=settings.grid_cycle_minutes),
         "agents": {
             b: MarketMakerAgent(
                 b,
@@ -83,10 +133,11 @@ def make_initial_state() -> Dict[str, Any]:
             )
             for b in BUILDING_IDS
         },
-        "history": [],  # Store historical data for time series
+        "history": recent_history,  # Store historical data for time series
         "max_history": 100,  # Keep last 100 steps
         "bid_to_building": {},  # Mapping bid_id -> building_id
         "ask_to_building": {},  # Mapping ask_id -> building_id
+        "db": db,  # Database instance for persistence
     }
 
 
@@ -94,7 +145,8 @@ def step(state: Dict[str, Any]) -> None:
     """Advance one simulation tick: update telemetry, submit orders, match, update carbon."""
     state["step_count"] = state.get("step_count", 0) + 1
     step_n = state["step_count"]
-    grid_gen: GridStressGenerator = state.get("grid_gen") or GridStressGenerator(cycle_minutes=GRID_CYCLE_MINUTES)
+    settings = get_settings()
+    grid_gen: GridStressGenerator = state.get("grid_gen") or GridStressGenerator(cycle_minutes=settings.grid_cycle_minutes)
     state["grid_gen"] = grid_gen
     grid_signal = grid_gen.get_signal()
     state["grid_stress"] = grid_signal.level
@@ -146,15 +198,57 @@ def step(state: Dict[str, Any]) -> None:
     new_trades = _match_orders(book)
     state["trades"] = state.get("trades", []) + new_trades
     state["total_kwh_saved"] = state.get("total_kwh_saved", 0.0) + sum(t.quantity_kwh for t in new_trades)
+
+    # Publish trade_executed for each new trade (event_bus → WebSocket / real-time clients)
+    bus = get_event_bus()
+    for t in new_trades:
+        seller_bid = ask_to_building.get(t.ask_id, "")
+        buyer_bid = bid_to_building.get(t.bid_id, "")
+        bus.publish(TRADE_EXECUTED, {
+            "trade_id": t.id,
+            "bid_id": t.bid_id,
+            "ask_id": t.ask_id,
+            "quantity_kwh": t.quantity_kwh,
+            "price_per_kwh": t.price_per_kwh,
+            "executed_at": t.executed_at.isoformat() if t.executed_at else None,
+            "seller_building_id": seller_bid,
+            "buyer_building_id": buyer_bid,
+            "agent_reasoning_seller": ai_reasoning.get(seller_bid),
+            "agent_reasoning_buyer": ai_reasoning.get(buyer_bid),
+        })
+
+    # Persist trades to database if enabled
+    db = state.get("db")
+    if db and new_trades:
+        try:
+            db.save_trades(new_trades)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to persist trades: {e}")
     
     # Store historical snapshot for time series
     history = state.get("history", [])
-    history.append({
+    history_entry = {
         "step": step_n,
         "timestamp": datetime.now(timezone.utc),
         "telemetry": telemetry,
         "grid_stress": grid_signal.level,
-    })
+    }
+    history.append(history_entry)
     # Keep only last N steps
     max_history = state.get("max_history", 100)
     state["history"] = history[-max_history:]
+    
+    # Persist history snapshot to database if enabled
+    if db:
+        try:
+            db.save_history_snapshot(
+                step=step_n,
+                timestamp=datetime.now(timezone.utc),
+                telemetry=telemetry,
+                grid_stress=grid_signal.level,
+                total_kwh_saved=state["total_kwh_saved"],
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to persist history snapshot: {e}")

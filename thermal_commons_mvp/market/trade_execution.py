@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 import uuid
 
@@ -51,9 +51,23 @@ class TradeExecution:
 
     async def _match_loop(self) -> None:
         """Consume queue and record trades."""
+        consecutive_errors = 0
+        max_consecutive_errors = 10
+        
         while self._running:
             try:
                 bid, ask = await asyncio.wait_for(self._queue.get(), timeout=1.0)
+                consecutive_errors = 0  # Reset on successful processing
+                
+                # Validate orders before matching
+                if bid.quantity_kwh <= 0 or ask.quantity_kwh <= 0:
+                    logger.warning(f"Invalid order quantities: bid={bid.quantity_kwh}, ask={ask.quantity_kwh}")
+                    continue
+                
+                if bid.price_per_kwh <= 0 or ask.price_per_kwh <= 0:
+                    logger.warning(f"Invalid order prices: bid={bid.price_per_kwh}, ask={ask.price_per_kwh}")
+                    continue
+                
                 qty = min(bid.quantity_kwh, ask.quantity_kwh)
                 price = (bid.price_per_kwh + ask.price_per_kwh) / 2.0
                 trade = Trade(
@@ -70,8 +84,23 @@ class TradeExecution:
                 continue
             except asyncio.CancelledError:
                 break
+            except ValueError as e:
+                # Data validation errors - log and continue
+                logger.warning(f"Trade validation error: {e}")
+                consecutive_errors += 1
+            except KeyError as e:
+                # Missing required fields - log and continue
+                logger.warning(f"Trade data missing field: {e}")
+                consecutive_errors += 1
             except Exception as e:
-                logger.exception("Match loop error: %s", e)
+                # Unexpected errors - log and track
+                logger.exception(f"Unexpected match loop error: {e}")
+                consecutive_errors += 1
+                
+                # Stop loop if too many consecutive errors (potential data corruption)
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.error(f"Too many consecutive errors ({consecutive_errors}), stopping match loop")
+                    break
 
     def get_trades(self) -> List[Trade]:
         """Return list of executed trades."""

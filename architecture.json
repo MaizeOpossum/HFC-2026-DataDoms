@@ -1,8 +1,8 @@
 {
     "project_manifest": {
         "name": "COOL - Cooperative Optimisation of Urban Loads",
-        "version": "1.0.0-MVP",
-        "mission": "Deploy decentralized agentic cooling swarm for Singapore commercial buildings.",
+        "version": "2.0.0-MVP",
+        "mission": "Deploy decentralized agentic cooling swarm for Singapore commercial buildings with smooth real-time visualizations.",
         "target_metric": "Maximize Carbon ROI via Inter-Building Energy Trading"
     },
     "architecture_blueprint": {
@@ -20,9 +20,238 @@
         },
         "layer_3_command": {
             "role": "Visualization & Audit",
-            "component": "The Market Dashboard",
-            "framework": "Streamlit",
-            "update_rate": "Real-time"
+            "component": "Hybrid Dashboard Architecture",
+            "framework": "Streamlit + WebSocket + React Component",
+            "update_rate": "Real-time (WebSocket) + Periodic (Streamlit)"
+        }
+    },
+    "new_architecture_design": {
+        "overview": "Hybrid architecture separating data updates from animation rendering to eliminate refresh jank",
+        "core_principles": [
+            "Separation of Concerns: Data layer vs Animation layer",
+            "Real-time Event Streaming: WebSocket for instant trade notifications",
+            "Persistent Animation State: Client-side state survives server refreshes",
+            "Minimal Component Recreation: Static animation containers with data injection",
+            "Modern Frontend: React/Vue component for smooth 60fps animations"
+        ],
+        "architecture_layers": {
+            "agent_layer": {
+                "description": "AI agent intelligence and decision-making",
+                "components": {
+                    "base_agent": {
+                        "location": "thermal_commons_mvp/agents/base_agent.py",
+                        "responsibility": "Abstract interface for all agents (compatible with RLlib/CityLearn)",
+                        "interface": "act(obs) -> action",
+                        "note": "Base class for both RL agents and market-making agents"
+                    },
+                    "market_maker_agent": {
+                        "location": "thermal_commons_mvp/agents/market_maker.py",
+                        "responsibility": "Market-making logic: generates bids/asks based on building state",
+                        "key_methods": {
+                            "submit_orders": "Generate bid/ask orders using AI decision engine",
+                            "get_ai_reasoning": "Retrieve AI's reasoning for last decision"
+                        },
+                        "instantiation": "One agent per building (50 agents total)",
+                        "lifecycle": "Created once in make_initial_state(), persists in simulation state"
+                    },
+                    "bid_generator": {
+                        "location": "thermal_commons_mvp/agents/bid_generator.py",
+                        "responsibility": "Compute willingness to trade and generate Bid/Ask orders",
+                        "features": [
+                            "AI-powered decision making (via AIDecisionEngine)",
+                            "Rule-based fallback when AI disabled",
+                            "Context-aware pricing based on telemetry, grid stress, trade history"
+                        ],
+                        "output": "Bid and Ask objects with price, quantity, TTL"
+                    },
+                    "ai_decision_engine": {
+                        "location": "thermal_commons_mvp/agents/ai_decision_engine.py",
+                        "responsibility": "AI-powered adaptive decision-making with learning",
+                        "strategies": {
+                            "aggressive": "High grid stress + high power → maximize load shedding",
+                            "conservative": "Low grid stress + comfortable temp → minimize disruption",
+                            "opportunistic": "Recent successful trades → replicate strategy",
+                            "adaptive": "Multi-factor weighted decision based on urgency score"
+                        },
+                        "learning": {
+                            "mechanism": "Tracks trade history, success rates, average prices",
+                            "adaptation": "Adjusts strategy based on market feedback",
+                            "context": "Uses DecisionContext (telemetry, grid signal, recent trades)"
+                        },
+                        "output": "AIDecision with bid_price, ask_price, quantities, reasoning, strategy, confidence"
+                    },
+                    "agent_grid": {
+                        "description": "Collection of 50 MarketMakerAgent instances (one per building)",
+                        "location": "thermal_commons_mvp/dashboard/simulation_engine.py",
+                        "storage": "state['agents'] dict: {building_id: MarketMakerAgent}",
+                        "initialization": "Created in make_initial_state() with use_ai=True",
+                        "execution_flow": {
+                            "step_1": "simulation_engine.step() iterates through all buildings",
+                            "step_2": "For each building: get telemetry, grid signal, recent trade history",
+                            "step_3": "Call agent.submit_orders(telemetry, grid_signal, trade_history)",
+                            "step_4": "Agent uses BidGenerator → AIDecisionEngine to generate bid/ask",
+                            "step_5": "Orders added to OrderBook for matching",
+                            "step_6": "When trades execute, agents learn from results (via trade_history)"
+                        }
+                    }
+                },
+                "agent_decision_flow": {
+                    "input": {
+                        "telemetry": "Current building state (temp, humidity, power_load)",
+                        "grid_signal": "Grid stress level (low/medium/high/critical)",
+                        "trade_history": "Last 20 trades for learning context"
+                    },
+                    "processing": {
+                        "step_1": "AIDecisionEngine.analyze_and_decide(DecisionContext)",
+                        "step_2": "Multi-factor analysis: temp_factor, power_factor, stress_factor",
+                        "step_3": "Strategy selection based on conditions (aggressive/conservative/opportunistic/adaptive)",
+                        "step_4": "Price/quantity calculation using strategy-specific formulas",
+                        "step_5": "Learning: adjust based on recent_success_rate and avg_price_received"
+                    },
+                    "output": {
+                        "bid": "Bid object (willingness to buy capacity, price, quantity)",
+                        "ask": "Ask object (willingness to sell/shed load, price, quantity)",
+                        "reasoning": "Human-readable explanation of AI decision",
+                        "strategy": "Selected strategy name",
+                        "confidence": "Confidence score (0-1)"
+                    }
+                },
+                "integration_with_new_architecture": {
+                    "event_publishing": {
+                        "when": "After agent generates orders and trades execute",
+                        "what": "Publish 'trade_executed' event with agent reasoning",
+                        "where": "simulation_engine.step() → event_bus.publish()",
+                        "data": {
+                            "trade": "Trade object (bid_id, ask_id, quantity, price)",
+                            "agent_reasoning": "AI decision reasoning from AIDecisionEngine",
+                            "strategy": "Strategy used (aggressive/conservative/etc)",
+                            "confidence": "AI confidence score"
+                        }
+                    },
+                    "real_time_visualization": {
+                        "websocket_message": "Include agent reasoning in trade events",
+                        "react_component": "Display AI reasoning in flight info boxes",
+                        "dashboard": "Show agent strategies in trade log"
+                    },
+                    "learning_loop": {
+                        "feedback": "Trade execution results feed back into agent's trade_history",
+                        "adaptation": "Agents learn from successful/unsuccessful trades",
+                        "persistence": "Agent state persists in simulation state (not lost on refresh)"
+                    }
+                }
+            },
+            "data_layer": {
+                "description": "Backend simulation and data generation",
+                "components": {
+                    "simulation_engine": {
+                        "location": "thermal_commons_mvp/dashboard/simulation_engine.py",
+                        "responsibility": "Run simulation steps, orchestrate agents, generate trades, update telemetry",
+                        "agent_integration": "Orchestrates 50 MarketMakerAgent instances, collects their orders",
+                        "output": "State dict with trades, telemetry, history, agent_reasoning",
+                        "key_functions": {
+                            "make_initial_state": "Initialize 50 agents with AI decision engines",
+                            "step": "For each building: get agent → submit_orders → match → execute trades → publish events"
+                        }
+                    },
+                    "event_bus": {
+                        "location": "thermal_commons_mvp/dashboard/event_bus.py",
+                        "responsibility": "Publish trade events to WebSocket subscribers",
+                        "pattern": "Observer pattern with async queue",
+                        "events": [
+                            "trade_executed: {bid_id, ask_id, quantity, price, timestamp, agent_reasoning, strategy}",
+                            "telemetry_updated: {building_id, metrics}",
+                            "grid_stress_changed: {stress_level, timestamp}",
+                            "agent_decision: {building_id, strategy, reasoning, confidence} (optional, for debugging)"
+                        ]
+                    },
+                    "websocket_server": {
+                        "location": "thermal_commons_mvp/dashboard/websocket_server.py",
+                        "responsibility": "Broadcast real-time events to connected clients",
+                        "framework": "FastAPI WebSocket or Socket.IO",
+                        "endpoints": {
+                            "/ws/trades": "Real-time trade stream (includes agent reasoning)",
+                            "/ws/telemetry": "Building telemetry updates",
+                            "/ws/grid": "Grid stress updates"
+                        }
+                    }
+                }
+            },
+            "presentation_layer": {
+                "description": "Streamlit dashboard for metrics and charts",
+                "components": {
+                    "main_dashboard": {
+                        "location": "thermal_commons_mvp/dashboard/app.py",
+                        "refresh_strategy": "Periodic refresh (3-5 seconds) for charts/metrics",
+                        "components": [
+                            "Carbon Counter (periodic update)",
+                            "Building Charts (periodic update)",
+                            "Time Series (periodic update)",
+                            "District Map (periodic update for building colors)",
+                            "Trade Log (periodic update)"
+                        ],
+                        "note": "These components don't need real-time updates, periodic refresh is acceptable"
+                    },
+                    "static_animation_container": {
+                        "location": "thermal_commons_mvp/dashboard/components/agent_network.py",
+                        "strategy": "Render once, update via WebSocket messages",
+                        "implementation": "React component embedded via st.components.v1.html()",
+                        "state_management": "Client-side only (React state + localStorage)",
+                        "update_mechanism": "WebSocket messages inject new trades without component recreation"
+                    }
+                }
+            },
+            "animation_layer": {
+                "description": "Client-side animation engine with persistent state",
+                "components": {
+                    "react_animation_component": {
+                        "location": "streamlit_components/agent_network_animation/",
+                        "framework": "React + TypeScript + Canvas API",
+                        "features": [
+                            "60fps smooth animations using requestAnimationFrame",
+                            "WebSocket client for real-time trade events",
+                            "Persistent state in localStorage/sessionStorage",
+                            "No dependency on Streamlit refresh cycle"
+                        ],
+                        "state_persistence": {
+                            "active_points": "Stored in React state + localStorage",
+                            "visible_labels": "Stored in React state + localStorage",
+                            "node_positions": "Static, calculated once on mount"
+                        },
+                        "websocket_integration": {
+                            "connection": "ws://localhost:8000/ws/trades",
+                            "message_format": "JSON: {type: 'trade', data: {bid_id, ask_id, quantity, price, timestamp}}",
+                            "reconnection": "Auto-reconnect with exponential backoff"
+                        }
+                    },
+                    "animation_engine": {
+                        "description": "Pure client-side animation logic",
+                        "features": [
+                            "Constant-speed point movement (distance-based)",
+                            "Glowing trail effects",
+                            "Flight info boxes with trade details",
+                            "Smooth fade-in/fade-out transitions",
+                            "No server round-trips for animation"
+                        ]
+                    }
+                }
+            }
+        },
+        "data_flow": {
+            "simulation_loop": {
+                "step_1": "simulation_engine.step() generates new trades",
+                "step_2": "event_bus.publish('trade_executed', trade_data)",
+                "step_3": "websocket_server broadcasts to all connected clients",
+                "step_4": "React component receives WebSocket message",
+                "step_5": "React state updates, triggers new animation point",
+                "step_6": "Animation runs independently at 60fps",
+                "note": "Streamlit dashboard refreshes separately every 3-5s for charts/metrics"
+            },
+            "animation_lifecycle": {
+                "initialization": "Component mounts once, connects to WebSocket, renders static nodes",
+                "runtime": "WebSocket messages trigger new animations, no component recreation",
+                "persistence": "Active animations stored in React state + localStorage",
+                "cleanup": "Component unmounts only on page navigation, not on Streamlit refresh"
+            }
         }
     },
     "tech_stack_selection": {
@@ -30,8 +259,109 @@
         "simulation_engine": "CityLearn (OpenAI Gym env for grid interaction)",
         "protocol_wrapper": "BAC0 (BACnet/IP communication)",
         "agent_framework": "Ray RLlib (Scalable PPO/DQN implementation)",
-        "backend_api": "FastAPI (Async handling of sensor streams)",
-        "frontend_ui": "Streamlit (Rapid MVP dashboarding)"
+        "backend_api": {
+            "framework": "FastAPI (Async handling of sensor streams)",
+            "websocket": "FastAPI WebSocket or python-socketio",
+            "purpose": "Real-time event broadcasting"
+        },
+        "frontend_ui": {
+            "dashboard": "Streamlit (Rapid MVP dashboarding for metrics/charts)",
+            "animations": "React + TypeScript (Smooth 60fps animations)",
+            "integration": "Streamlit Custom Component (st.components.v1.html with React bundle)",
+            "build_tool": "Vite (Fast, modern bundler for React component)"
+        },
+        "state_management": {
+            "server": "Python dict (simulation state) + Event bus",
+            "client_animation": "React useState + localStorage",
+            "client_dashboard": "Streamlit session_state"
+        }
+    },
+    "implementation_plan": {
+        "phase_1_backend_events": {
+            "priority": "High",
+            "tasks": [
+                "Create event_bus.py with async queue and observer pattern",
+                "Modify simulation_engine.py to publish trade events",
+                "Create websocket_server.py with FastAPI WebSocket endpoint",
+                "Test event publishing and WebSocket broadcasting"
+            ],
+            "estimated_effort": "2-3 hours"
+        },
+        "phase_2_react_component": {
+            "priority": "High",
+            "tasks": [
+                "Create streamlit_components/agent_network_animation/ directory",
+                "Set up React + TypeScript + Vite project",
+                "Implement WebSocket client connection",
+                "Port existing animation logic from agent_network.py to React",
+                "Add localStorage persistence for active animations",
+                "Build and bundle component"
+            ],
+            "estimated_effort": "4-6 hours"
+        },
+        "phase_3_integration": {
+            "priority": "Medium",
+            "tasks": [
+                "Create Python wrapper for React component",
+                "Update agent_network.py to use new React component",
+                "Ensure WebSocket connection works in Streamlit context",
+                "Test animation smoothness and state persistence"
+            ],
+            "estimated_effort": "2-3 hours"
+        },
+        "phase_4_optimization": {
+            "priority": "Low",
+            "tasks": [
+                "Optimize WebSocket message size",
+                "Add reconnection logic with exponential backoff",
+                "Implement animation queue for high-frequency trades",
+                "Add performance monitoring"
+            ],
+            "estimated_effort": "2-3 hours"
+        }
+    },
+    "migration_strategy": {
+        "backward_compatibility": "Keep existing agent_network.py as fallback",
+        "feature_flag": "Use environment variable to toggle between old/new implementation",
+        "gradual_rollout": "Test React component alongside existing HTML/Canvas version",
+        "rollback_plan": "Revert to HTML/Canvas if WebSocket issues occur"
+    },
+    "performance_targets": {
+        "animation_fps": "60fps (browser-native requestAnimationFrame)",
+        "trade_latency": "< 100ms from simulation to animation start",
+        "websocket_latency": "< 50ms message delivery",
+        "component_recreation": "Zero (component mounts once, updates via WebSocket)",
+        "memory_usage": "< 50MB for animation component",
+        "cpu_usage": "< 5% for animation loop"
+    },
+    "modern_dashboard_features": {
+        "visual_design": {
+            "theme": "Dark mode with glassmorphism effects",
+            "color_scheme": "Cyan to red gradients for energy flow",
+            "typography": "Modern sans-serif (Inter, Poppins)",
+            "spacing": "Generous padding, clean grid layout",
+            "animations": "Smooth transitions, micro-interactions"
+        },
+        "user_experience": {
+            "interactivity": "Click nodes to show/hide labels, hover for details",
+            "real_time_feedback": "Instant visual response to trades",
+            "information_density": "Progressive disclosure (show details on demand)",
+            "accessibility": "Keyboard navigation, screen reader support"
+        },
+        "responsive_design": {
+            "breakpoints": "Mobile (< 768px), Tablet (768-1024px), Desktop (> 1024px)",
+            "layout_adaptation": "Stack components vertically on mobile",
+            "touch_interactions": "Swipe gestures for mobile navigation"
+        }
+    },
+    "key_improvements_over_previous_architecture": {
+        "animation_smoothness": "Eliminated 3-second refresh jank by using WebSocket + React",
+        "state_persistence": "React state + localStorage survives Streamlit refreshes",
+        "real_time_updates": "Trades appear instantly via WebSocket, not batched every 3s",
+        "component_lifecycle": "Animation component mounts once, never recreated",
+        "separation_of_concerns": "Data layer (Streamlit) separate from animation layer (React)",
+        "scalability": "WebSocket can handle multiple clients, event bus scales horizontally",
+        "maintainability": "React component is testable, debuggable, type-safe"
     },
     "development_roadmap": {
         "stream_a_simulation": {
@@ -40,25 +370,49 @@
             "tasks": [
                 "Initialize CityLearn environment with 'Building_5' dataset (tropical preset).",
                 "Expose step() function to return [temp, humidity, power_load].",
-                "Implement 'Grid Stress' signal generator (mock demand response events)."
+                "Implement 'Grid Stress' signal generator (mock demand response events).",
+                "Add event publishing to simulation_engine.step() for trade events."
             ]
         },
         "stream_b_agent_logic": {
             "owner": "AI Engineer",
-            "objective": "Enable negotiation",
+            "objective": "Enable intelligent negotiation with learning",
             "tasks": [
                 "Develop 'RbcAgent' (Rule-Based Control) for baseline stability.",
                 "Implement 'BidGenerator': Calculate willingness to shed load vs. comfort cost.",
-                "Implement 'TradeExecution': Simple order matching engine (asyncio.Queue)."
+                "Implement 'AIDecisionEngine': Multi-strategy AI decision-making with learning.",
+                "Implement 'MarketMakerAgent': Agent that uses AI to generate bids/asks.",
+                "Implement 'TradeExecution': Simple order matching engine (asyncio.Queue).",
+                "Add agent reasoning to trade events published to event_bus.",
+                "Implement learning loop: agents learn from trade history and adapt strategies.",
+                "Add agent decision events to WebSocket stream (optional, for debugging)."
+            ],
+            "current_status": "✅ Implemented: MarketMakerAgent, BidGenerator, AIDecisionEngine with 4 strategies",
+            "enhancements_needed": [
+                "Publish agent reasoning in trade events",
+                "Add agent decision events to WebSocket (for real-time strategy visualization)",
+                "Implement more sophisticated learning (e.g., RL-based adaptation)"
             ]
         },
         "stream_c_dashboard": {
             "owner": "Frontend Dev",
-            "objective": "Visualize impact for judges",
+            "objective": "Visualize impact with smooth animations",
             "tasks": [
                 "Build Streamlit layout: Left Col (Live Gauges), Right Col (Trade Log).",
                 "Create 'Carbon Counter' component: Aggregating real-time savings.",
-                "Integrate 3D Map visual (using PyDeck) for district visualization."
+                "Integrate 3D Map visual (using PyDeck) for district visualization.",
+                "Build React animation component with WebSocket integration.",
+                "Implement smooth 60fps animations with persistent state."
+            ]
+        },
+        "stream_d_realtime_infrastructure": {
+            "owner": "Backend Dev",
+            "objective": "Enable real-time event streaming",
+            "tasks": [
+                "Implement event_bus.py with async queue and observer pattern.",
+                "Create FastAPI WebSocket server for trade broadcasting.",
+                "Integrate WebSocket server with Streamlit dashboard.",
+                "Add reconnection logic and error handling."
             ]
         }
     },
@@ -70,12 +424,63 @@
             "interface/bacnet_driver.py",
             "simulation/city_gym.py",
             "dashboard/app.py",
+            "dashboard/event_bus.py",
+            "dashboard/websocket_server.py",
+            "dashboard/simulation_engine.py",
+            "dashboard/components/agent_network.py",
+            "dashboard/components/agent_network_react.py",
             "utils/carbon_calculator.py"
+        ],
+        "frontend_components": [
+            "streamlit_components/agent_network_animation/package.json",
+            "streamlit_components/agent_network_animation/src/index.tsx",
+            "streamlit_components/agent_network_animation/src/AgentNetwork.tsx",
+            "streamlit_components/agent_network_animation/src/WebSocketClient.ts",
+            "streamlit_components/agent_network_animation/src/AnimationEngine.ts",
+            "streamlit_components/agent_network_animation/vite.config.ts"
         ]
     },
     "key_differentiators": [
         "Uses industry-standard BACnet protocol (Feasibility).",
         "Leverages CityLearn for scientifically valid energy modelling (Impact).",
-        "Demonstrates emergent behavior via autonomous bidding (True Agentic AI)."
-    ]
+        "Demonstrates emergent behavior via autonomous bidding (True Agentic AI).",
+        "AI-powered agents with adaptive learning: 4 strategies (aggressive/conservative/opportunistic/adaptive) that learn from trade history.",
+        "50 autonomous agents (one per building) making independent decisions based on local state and market conditions.",
+        "Smooth 60fps animations with zero refresh jank (Modern UX).",
+        "Real-time WebSocket event streaming for instant trade visualization (Performance).",
+        "Hybrid architecture: Streamlit for metrics, React for animations (Best of both worlds).",
+        "Agent reasoning visible in real-time: AI decisions explained with strategy and confidence scores."
+    ],
+    "technical_debt_mitigation": {
+        "current_issues": [
+            "Streamlit fragment refresh causes animation jank",
+            "HTML component recreation loses JavaScript state",
+            "Batch trade detection (3-second delay)",
+            "No real-time event system"
+        ],
+        "solutions": [
+            "WebSocket for real-time events (eliminates batch delay)",
+            "React component with persistent state (survives refreshes)",
+            "Separation of data and animation layers (independent update cycles)",
+            "Event bus pattern for scalable event distribution"
+        ]
+    },
+    "testing_strategy": {
+        "unit_tests": [
+            "Event bus publishing/subscribing",
+            "WebSocket message serialization",
+            "React component state management",
+            "Animation engine calculations"
+        ],
+        "integration_tests": [
+            "Simulation → Event Bus → WebSocket → React component",
+            "Multiple WebSocket clients receiving same events",
+            "Component state persistence across Streamlit refreshes"
+        ],
+        "performance_tests": [
+            "WebSocket latency under load",
+            "Animation FPS with 100+ active points",
+            "Memory usage over extended runtime"
+        ]
+    }
 }

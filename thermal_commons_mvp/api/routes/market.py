@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from thermal_commons_mvp.api.dependencies import get_order_book, get_trade_execution
+from thermal_commons_mvp.api.dependencies import get_order_book, get_trade_execution, verify_api_key
 from thermal_commons_mvp.models.bids import BidStatus
 
 router = APIRouter()
@@ -39,7 +39,10 @@ def order_book_snapshot(
 
 
 @router.get("/trades")
-def trade_history(tex=Depends(get_trade_execution)) -> dict[str, List[dict[str, Any]]]:
+def trade_history(
+    tex=Depends(get_trade_execution),
+    _auth=Depends(verify_api_key),
+) -> dict[str, List[dict[str, Any]]]:
     """Return executed trades."""
     trades = tex.get_trades()
     return {
@@ -61,6 +64,7 @@ def trade_history(tex=Depends(get_trade_execution)) -> dict[str, List[dict[str, 
 def submit_bid(
     body: BidSubmit,
     ob=Depends(get_order_book),
+    _auth=Depends(verify_api_key),
 ) -> dict[str, str]:
     """Register a new bid (stub: stores in memory)."""
     from thermal_commons_mvp.models.bids import Bid, BidType
@@ -82,6 +86,7 @@ def submit_bid(
 def submit_ask(
     body: AskSubmit,
     ob=Depends(get_order_book),
+    _auth=Depends(verify_api_key),
 ) -> dict[str, str]:
     """Register a new ask (stub: stores in memory)."""
     from thermal_commons_mvp.models.bids import Ask, BidType

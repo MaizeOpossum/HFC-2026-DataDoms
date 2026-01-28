@@ -6,3 +6,7 @@
 # Polling is more stable and avoids the blank/half-loaded UI that can result
 # from file-watcher crashes during app startup/reruns.
 fileWatcherType = "poll"
+
+# Mapbox token for PyDeck maps
+# PyDeck will read this automatically if MAPBOX_ACCESS_TOKEN env var is not set
+# Note: Token is also loaded from .env file via settings.py

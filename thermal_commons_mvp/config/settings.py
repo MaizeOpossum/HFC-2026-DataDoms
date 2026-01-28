@@ -38,6 +38,24 @@ class Settings(BaseSettings):
     # Mapbox (reads from MAPBOX_ACCESS_TOKEN env var)
     mapbox_access_token: Optional[str] = None
 
+    # Dashboard
+    dashboard_refresh_seconds: int = 3
+
+    # Simulation
+    grid_cycle_minutes: int = 4  # short cycle so stress changes visible in demo
+
+    # API Security
+    cors_origins: str = "*"  # Comma-separated list of allowed origins, or "*" for all
+    cors_allow_credentials: bool = True
+    cors_allow_methods: str = "*"  # Comma-separated list or "*" for all
+    cors_allow_headers: str = "*"  # Comma-separated list or "*" for all
+    api_key: Optional[str] = None  # API key for authentication (optional)
+    rate_limit_per_minute: int = 60  # Requests per minute per IP
+
+    # Persistence
+    enable_persistence: bool = True  # Enable SQLite persistence
+    db_path: Optional[str] = None  # Custom database path (defaults to data/cool_state.db)
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -62,7 +62,7 @@ class BidGenerator:
         else:
             # Fallback to rule-based
             q = quantity_kwh or max(0.0, telemetry.power_load_kw * 0.1)
-            stress_factor = (grid_signal.value if grid_signal else 0.0) or 0.5
+            stress_factor = grid_signal.value if grid_signal else 0.5
             price = self.load_shed_price_base * (1.0 + stress_factor) * (1.0 - self.comfort_weight * 0.3)
         
         now = datetime.now(timezone.utc)
@@ -101,7 +101,7 @@ class BidGenerator:
         else:
             # Fallback to rule-based
             q = quantity_kwh or max(0.0, telemetry.power_load_kw * 0.05)
-            stress_factor = (grid_signal.value if grid_signal else 0.0) or 0.5
+            stress_factor = grid_signal.value if grid_signal else 0.5
             price = self.load_shed_price_base * stress_factor * self.comfort_weight
         
         now = datetime.now(timezone.utc)

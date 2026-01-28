@@ -35,6 +35,13 @@ class Bid:
     created_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
 
+    def __post_init__(self) -> None:
+        """Validate bid values."""
+        if self.price_per_kwh <= 0:
+            raise ValueError(f"price_per_kwh must be positive, got {self.price_per_kwh}")
+        if self.quantity_kwh <= 0:
+            raise ValueError(f"quantity_kwh must be positive, got {self.quantity_kwh}")
+
 
 @dataclass(frozen=True)
 class Ask:
@@ -48,3 +55,10 @@ class Ask:
     status: BidStatus = BidStatus.OPEN
     created_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        """Validate ask values."""
+        if self.price_per_kwh <= 0:
+            raise ValueError(f"price_per_kwh must be positive, got {self.price_per_kwh}")
+        if self.quantity_kwh <= 0:
+            raise ValueError(f"quantity_kwh must be positive, got {self.quantity_kwh}")

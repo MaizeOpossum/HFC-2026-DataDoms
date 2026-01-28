@@ -24,10 +24,10 @@ def inject_custom_css() -> None:
         --star-gold: #FBBF24;
     }
     
-    /* Main container */
+    /* Main container - no excess padding/skeleton boxes */
     .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
         max-width: 1400px;
     }
     
@@ -168,15 +168,17 @@ def inject_custom_css() -> None:
         box-shadow: none !important;
     }
     
-    /* Tidy up genuinely empty layout padding boxes without touching real content */
+    /* Remove empty layout / skeleton boxes completely - no padding, no space */
     section[data-testid="stVerticalBlock"]:empty,
     div[data-testid="stVerticalBlock"]:empty,
-    [data-testid="column"]:empty {
+    [data-testid="column"]:empty,
+    div[data-testid="stHorizontalBlock"]:empty {
+        display: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        border: none !important;
-        background: transparent !important;
         min-height: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
     }
     
     /* Scrollbar styling */
@@ -213,8 +215,7 @@ def inject_custom_css() -> None:
         box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
     }
     
-    /* Absolutely disable any card styling on Streamlit's automatic element wrappers.
-       This removes all "skeleton" boxes, even when those wrappers contain layout divs. */
+    /* Strip skeleton/empty wrappers - no padding, no visible box */
     .element-container,
     div[data-testid="stElementContainer"] {
         background: transparent !important;
@@ -222,6 +223,7 @@ def inject_custom_css() -> None:
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
+        animation: fadeIn 0.5s ease-out;
     }
 
     /* Also ensure bare markdown wrappers never appear as empty cards/skeletons */
@@ -264,10 +266,6 @@ def inject_custom_css() -> None:
     @keyframes glow {
         0%, 100% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.5); }
         50% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
-    }
-    
-    .element-container {
-        animation: fadeIn 0.5s ease-out;
     }
     
     /* Section dividers */
@@ -333,9 +331,9 @@ def inject_custom_css() -> None:
         padding: 0.5rem !important;
     }
     
-    /* Reduce spacing between elements */
+    /* No extra spacing from skeleton/wrapper boxes */
     .element-container {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0 !important;
     }
     
     /* Compact selectbox */
@@ -343,9 +341,9 @@ def inject_custom_css() -> None:
         margin-bottom: 0.5rem !important;
     }
     
-    /* Improved spacing for sections */
+    /* Minimal gap between real sections; empty skeleton blocks are hidden via CSS/JS */
     section[data-testid="stVerticalBlock"] {
-        gap: 1rem;
+        gap: 0.5rem;
     }
     
     /* Custom scrollbar for dataframes */
@@ -382,6 +380,11 @@ def inject_custom_css() -> None:
         background: var(--bg-card) !important;
         border: 1px solid var(--primary) !important;
     }
+    
+    /* Dark background for map container (only if using light fallback) */
+    div[data-testid="stPydeckChart"] {
+        background-color: #0a0a1a !important;
+    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -401,6 +404,43 @@ def inject_custom_js() -> None:
         `;
         document.head.appendChild(style);
         
+        // Remove ALL empty skeleton/padding boxes - hide completely so they take zero space.
+        function collapseEmpty(el) {
+            if (!el || el._skeletonRemoved) return;
+            el._skeletonRemoved = true;
+            el.style.display = 'none';
+            el.style.height = '0';
+            el.style.minHeight = '0';
+            el.style.margin = '0';
+            el.style.padding = '0';
+            el.style.overflow = 'hidden';
+            el.style.border = 'none';
+            el.style.background = 'transparent';
+        }
+        function hasRealContent(node) {
+            if (!node) return false;
+            const real = node.querySelector(
+                'canvas,svg,img,iframe,video,table,pre,code,' +
+                'input,select,textarea,button,' +
+                '[data-testid="stMetric"],[data-testid="stDataFrame"],[data-testid="stChart"],[data-testid="stPydeckChart"],[data-testid="stMarkdown"]'
+            );
+            if (real) return true;
+            const t = (node.textContent || '').replace(/\\s+/g, ' ').trim();
+            return t.length > 0;
+        }
+        function removeSkeletonContainers() {
+            const sel = '[data-testid="stElementContainer"], [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"], [data-testid="column"]';
+            document.querySelectorAll(sel).forEach((el) => {
+                if (el._skeletonRemoved) return;
+                if (hasRealContent(el)) return;
+                collapseEmpty(el);
+                ['stVerticalBlock', 'stColumn', 'stHorizontalBlock', 'stLayoutWrapper'].forEach((tid) => {
+                    const p = el.closest('[data-testid="' + tid + '"]');
+                    if (p && !p._skeletonRemoved && !hasRealContent(p)) collapseEmpty(p);
+                });
+            });
+        }
+
         // Add glow effect to metrics on update
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
@@ -421,6 +461,11 @@ def inject_custom_js() -> None:
             childList: true,
             subtree: true
         });
+
+        // Run skeleton cleanup immediately and on DOM changes (Streamlit reruns)
+        removeSkeletonContainers();
+        const skeletonObserver = new MutationObserver(removeSkeletonContainers);
+        skeletonObserver.observe(document.body, { childList: true, subtree: true });
         
         // Add hover effects to cards
         const cards = document.querySelectorAll('.stMetric, .element-container');

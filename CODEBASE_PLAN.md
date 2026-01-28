@@ -1,7 +1,8 @@
 # COOL — Codebase Plan
 
-Plan for **thermal_commons_mvp** aligned with `architecture.json`.  
-Structured for clarity, testability, and Python 3.10+ best practices.
+Plan for **thermal_commons_mvp** aligned with [`architecture.json`](architecture.json) and [`DASHBOARD_AND_AGENTS_PLAN.md`](DASHBOARD_AND_AGENTS_PLAN.md).  
+Structured for a **clean modern dashboard** and an **AI agentic backend** that handles trades between buildings.  
+Python 3.10+ best practices.
 
 ---
 
@@ -61,15 +62,16 @@ thermal_commons_mvp/
 | `__init__.py` | Re-export `BACnetDriver` |
 | `bacnet_driver.py` | BAC0-based driver: connect, read points (temp, humidity, load), optional write; abstract interface for simulation swap |
 
-### 2.5 `agents/` — *Stream B*
+### 2.5 `agents/` — *Stream B (AI agentic backend)*
 
 | File | Purpose |
 |------|--------|
-| `__init__.py` | Re-export `BaseAgent`, `RbcAgent`, `MarketMakerAgent` |
+| `__init__.py` | Re-export `BaseAgent`, `RbcAgent`, `MarketMakerAgent`, `BidGenerator`, `AIDecisionEngine` |
 | `base_agent.py` | Abstract `BaseAgent`: `act(obs) -> action`, interface for RLlib/CityLearn |
 | `rbc_agent.py` | Rule-based controller: comfort vs. load, baseline stability |
-| `market_maker.py` | Market-making logic: submit bids/asks based on local state and grid stress |
-| `bid_generator.py` | `BidGenerator`: willingness to shed load vs. comfort cost → `Bid`/`Ask` |
+| `market_maker.py` | Market-making logic: one agent per building; `submit_orders(telemetry, grid_signal, trade_history)` |
+| `bid_generator.py` | `BidGenerator`: willingness to trade → `Bid`/`Ask`; uses `AIDecisionEngine` when `use_ai=True` |
+| `ai_decision_engine.py` | `AIDecisionEngine`: four strategies (aggressive/conservative/opportunistic/adaptive), learning from trade history |
 
 ### 2.6 `market/` — *Stream B*
 
@@ -90,17 +92,23 @@ thermal_commons_mvp/
 | `routes/market.py` | Submit bid/ask, order book snapshot, trade history |
 | `dependencies.py` | Shared injectables: settings, driver, order book, trade execution |
 
-### 2.8 `dashboard/` — *Stream C*
+### 2.8 `dashboard/` — *Stream C (clean modern dashboard)*
 
 | File | Purpose |
 |------|--------|
 | `__init__.py` | — |
-| `app.py` | Streamlit entrypoint: layout (e.g. left: Live Gauges, right: Trade Log), refresh rate |
+| `app.py` | Streamlit entrypoint: layout, `@st.fragment(run_every=REFRESH_SECONDS)`; carbon, charts, map, agent network, trade log |
+| `simulation_engine.py` | Simulation orchestration: telemetry, 50 agents, order book, matching, trades, carbon; publishes `trade_executed` to event_bus |
+| `event_bus.py` | In-process pub/sub: `subscribe(topic, callback)`, `publish(topic, payload)`; topics: `trade_executed`, `telemetry_updated`, `grid_stress_changed` |
+| `websocket_server.py` | Standalone FastAPI app: runs simulation in a thread, subscribes to event_bus, broadcasts trade events to WebSocket clients at `/ws/trades` |
 | `components/` | |
 | `components/gauges.py` | Live gauges for temp, humidity, power, grid stress |
-| `components/carbon_counter.py` | Carbon Counter: aggregate real-time savings from `utils.carbon_calculator` |
+| `components/carbon_counter.py` | Carbon Counter: aggregate real-time savings from trades |
 | `components/trade_log.py` | Trade log table / feed |
-| `components/district_map.py` | 3D district map via PyDeck |
+| `components/district_map.py` | Static PyDeck district map; building points at real locations |
+| `components/agent_network.py` | Agent Network: ring of building nodes, animated points for trades (seller→buyer), labels on click |
+| `components/building_charts.py` | Building bar chart and time-series chart |
+| `components/styling.py` | Custom CSS/JS for modern look |
 
 ### 2.9 `utils/`
 
@@ -143,18 +151,23 @@ thermal_commons_mvp/
 
 ---
 
-## 6. Mapping to architecture.json
+## 6. Mapping to architecture.json and DASHBOARD_AND_AGENTS_PLAN.md
 
 | Architecture element | Code location |
 |----------------------|---------------|
 | Layer 1 – BMS Connector (BACnet) | `interface/bacnet_driver.py` |
 | Layer 1 – Simulation (mock world) | `simulation/city_gym.py`, `simulation/grid_stress.py` |
-| Layer 2 – Agent Grid, MARL | `agents/base_agent.py`, `agents/rbc_agent.py`, `agents/market_maker.py`, `agents/bid_generator.py` |
-| Layer 2 – Order matching | `market/order_book.py`, `market/trade_execution.py` |
+| Layer 2 – Agent Grid (AI agentic backend) | `agents/base_agent.py`, `agents/market_maker.py`, `agents/bid_generator.py`, `agents/ai_decision_engine.py` |
+| Layer 2 – Order matching / trades between buildings | `market/order_book.py`; matching in `dashboard/simulation_engine._match_orders()` |
 | Layer 3 – Market Dashboard | `dashboard/app.py`, `dashboard/components/*` |
+| Event bus (trade_executed) | `dashboard/event_bus.py`; `simulation_engine.step()` publishes after matching |
+| WebSocket server (real-time trades) | `dashboard/websocket_server.py`; run with `cool-ws` or `python -m thermal_commons_mvp.dashboard.websocket_server` |
+| Telemetry (mock in dashboard) | `dashboard/simulation_engine._random_telemetry()`; API: `api/routes/telemetry.py` + `interface/bacnet_driver.py` |
 | Carbon ROI / savings | `utils/carbon_calculator.py`, `dashboard/components/carbon_counter.py` |
 | Stream A (simulation) | `simulation/` |
 | Stream B (agents + market) | `agents/`, `market/` |
 | Stream C (dashboard) | `dashboard/` |
 
-This plan keeps the codebase **structured**, **categorized**, and aligned with **Python best practices** and your architecture.
+Target architecture (event bus, WebSocket, React Agent Network) is described in `architecture.json` § `new_architecture_design` and in `DASHBOARD_AND_AGENTS_PLAN.md`.
+
+This plan keeps the codebase **structured**, **categorized**, and aligned with a **clean modern dashboard** and **AI agentic backend** that handles trades between buildings.

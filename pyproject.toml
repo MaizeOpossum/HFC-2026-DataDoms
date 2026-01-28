@@ -21,6 +21,7 @@ dependencies = [
     "streamlit>=1.28",
     "pydeck>=0.8",
     "pandas>=2.0",
+    "plotly>=5.0",
     "structlog>=23.0",
 ]
 
@@ -43,6 +44,7 @@ dev = [
 cool-sim = "thermal_commons_mvp.simulation.city_gym:main"
 cool-api = "thermal_commons_mvp.api.main:main"
 cool-dash = "thermal_commons_mvp.dashboard.app:run_dashboard"
+cool-ws = "thermal_commons_mvp.dashboard.websocket_server:run"
 
 [tool.setuptools.packages.find]
 where = ["."]

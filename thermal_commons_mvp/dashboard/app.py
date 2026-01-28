@@ -1,4 +1,4 @@
-"""Streamlit entrypoint: left col (Live Gauges), right col (Trade Log), Carbon Counter, 3D map."""
+"""Streamlit entrypoint: Carbon Counter, charts, district map, Energy in transit."""
 
 import sys
 from pathlib import Path
@@ -11,11 +11,12 @@ if _PROJECT_ROOT not in sys.path:
 
 import streamlit as st
 
+from thermal_commons_mvp.config import get_settings
 from thermal_commons_mvp.dashboard.components.building_charts import render_building_bar_chart, render_time_series_chart
 from thermal_commons_mvp.dashboard.components.carbon_counter import render_carbon_counter
 from thermal_commons_mvp.dashboard.components.styling import inject_custom_css, inject_custom_js
-from thermal_commons_mvp.dashboard.components.trade_log import render_trade_log
 from thermal_commons_mvp.dashboard.components.district_map import render_district_map
+from thermal_commons_mvp.dashboard.components.agent_network import render_agent_network
 from thermal_commons_mvp.dashboard.simulation_engine import make_initial_state, step
 
 st.set_page_config(
@@ -30,7 +31,8 @@ inject_custom_css()
 inject_custom_js()
 
 SIM_KEY = "sim"
-REFRESH_SECONDS = 3
+settings = get_settings()
+REFRESH_SECONDS = settings.dashboard_refresh_seconds
 
 
 @st.fragment(run_every=REFRESH_SECONDS)
@@ -62,13 +64,17 @@ def live_simulation():
     render_district_map(
         telemetry_by_building=sim.get("telemetry"),
         grid_stress=sim.get("grid_stress"),
-    )
-
-    # Trade log section (now below the map)
-    render_trade_log(
         trades=sim.get("trades"),
         bid_to_building=sim.get("bid_to_building", {}),
         ask_to_building=sim.get("ask_to_building", {}),
+    )
+    
+    # Energy in transit (below the map): seller → bolt → buyer with qty & price
+    render_agent_network(
+        trades=sim.get("trades"),
+        bid_to_building=sim.get("bid_to_building", {}),
+        ask_to_building=sim.get("ask_to_building", {}),
+        key="agent_network",
     )
 
 
@@ -82,7 +88,7 @@ def main() -> None:
             padding: 2rem; 
             background: linear-gradient(135deg, rgba(30, 27, 75, 0.4) 0%, rgba(76, 29, 149, 0.3) 100%);
             border-radius: 16px;
-            border: 1px solid rgba(139, 92, 246, 0.3);
+            border: 0px transparent;
             backdrop-filter: blur(10px);
             box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
         ">
@@ -92,8 +98,8 @@ def main() -> None:
             </p>
             <p style="font-size: 1rem; color: #9CA3AF; margin-top: 0.75rem;">
                 ⚡ Real-time Carbon ROI via inter-building energy trading • 
-                🤖 50 AI-powered buildings • 
-                🏙️ Singapore District Network
+                50 AI-powered buildings • 
+                Singapore District Network
             </p>
         </div>
         """,
@@ -108,7 +114,6 @@ if __name__ == "__main__":
 
 def run_dashboard() -> None:
     """Entrypoint for `cool-dash` console script: run Streamlit programmatically."""
-    import sys
     from streamlit.web import cli as stcli
 
     sys.argv = ["streamlit", "run", __file__, "--server.headless", "true"]

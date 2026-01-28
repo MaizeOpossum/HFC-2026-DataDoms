@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
-from thermal_commons_mvp.api.dependencies import get_driver
+from thermal_commons_mvp.api.dependencies import get_driver, verify_api_key
 
 router = APIRouter()
 
@@ -19,7 +19,11 @@ class TelemetryResponse(BaseModel):
 
 
 @router.get("/{building_id}", response_model=TelemetryResponse)
-def get_telemetry(building_id: str, driver=Depends(get_driver)) -> TelemetryResponse:
+def get_telemetry(
+    building_id: str,
+    driver=Depends(get_driver),
+    _auth=Depends(verify_api_key),
+) -> TelemetryResponse:
     """Return current telemetry for a building."""
     t = driver.read_telemetry(building_id)
     return TelemetryResponse(

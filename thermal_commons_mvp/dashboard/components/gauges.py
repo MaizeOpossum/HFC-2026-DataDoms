@@ -28,9 +28,9 @@ def render_gauges(
             expanded = idx < 3
             with st.expander(f"🤖 {building_id} — AI Agent", expanded=expanded):
                 row = st.columns(4)
-                row[0].metric("Temperature (°C)", f"{getattr(t, 'temp_c', 0):.1f}")
+                row[0].metric("Temp.", f"{getattr(t, 'temp_c', 0):.1f}")
                 row[1].metric("Humidity (%)", f"{getattr(t, 'humidity_pct', 0):.0f}")
-                row[2].metric("Power (kW)", f"{getattr(t, 'power_load_kw', 0):.1f}")
+                row[2].metric("Power", f"{getattr(t, 'power_load_kw', 0):.1f}")
                 row[3].metric("Grid stress", grid_stress or "—")
                 
                 # Show AI reasoning if available
@@ -40,10 +40,10 @@ def render_gauges(
         d = _sample_telemetry()
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            st.metric("Temperature (°C)", f"{d['temp_c']:.1f}", delta=None)
+            st.metric("Temp.", f"{d['temp_c']:.1f}", delta=None)
         with c2:
             st.metric("Humidity (%)", f"{d['humidity_pct']:.0f}", delta=None)
         with c3:
-            st.metric("Power (kW)", f"{d['power_load_kw']:.1f}", delta=None)
+            st.metric("Power", f"{d['power_load_kw']:.1f}", delta=None)
         with c4:
             st.metric("Grid stress", d["grid_stress"], delta=None)

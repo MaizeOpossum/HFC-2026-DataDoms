@@ -14,20 +14,6 @@ def render_trade_log(
     ask_to_building: Optional[Dict[str, str]] = None,
 ) -> None:
     """Render trade log with building names and prices in a labeled table with overflow."""
-    # Compact container
-    st.markdown(
-        """
-        <div style="
-            background: rgba(26, 31, 58, 0.6);
-            border-radius: 12px;
-            padding: 1.5rem;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            margin-bottom: 1rem;
-        ">
-        """,
-        unsafe_allow_html=True,
-    )
-    
     st.markdown("### 💱 Recent Trades")
     
     bid_to_building = bid_to_building or {}
@@ -80,5 +66,3 @@ def render_trade_log(
         })
         st.dataframe(empty_df, use_container_width=True, hide_index=True, height=100)
         st.caption("Waiting for trades...")
-    
-    st.markdown("</div>", unsafe_allow_html=True)

@@ -14,7 +14,7 @@ This repo implements a **clean, modern dashboard** and an **AI agentic backend**
 thermal_commons_mvp/
 ├── config/         # Settings (Pydantic), constants
 ├── models/         # Telemetry, Bid/Ask, Trade, GridStress
-├── simulation/     # CityLearn gym, grid stress generator
+├── simulation/     # Grid stress generator, optional CityLearn integration
 ├── interface/      # BACnet BMS driver (BAC0)
 ├── agents/         # BaseAgent, MarketMaker, BidGenerator, AIDecisionEngine
 ├── market/         # OrderBook (matching in simulation_engine)
@@ -56,7 +56,7 @@ streamlit run thermal_commons_mvp/dashboard/app.py
 # 6. Open browser to http://localhost:8501
 ```
 
-**Optional — CityLearn simulation:** The default install runs the sim in **mock mode** (no CityLearn). For real CityLearn environments, use a **separate virtualenv** and `pip install -e ".[simulation]"` there, since CityLearn pins older gymnasium/pandas.
+**Note — Simulation:** The dashboard runs in **mock mode** by default (generates realistic-looking telemetry). CityLearn integration has been **shelved** due to installation/dependency issues, but the codebase is structured to support real-world data sources like CityLearn in the future. See [`CITYLEARN_SETUP.md`](CITYLEARN_SETUP.md) for details.
 
 ## Run
 

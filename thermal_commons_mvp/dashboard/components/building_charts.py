@@ -1,6 +1,7 @@
 """Bar chart and time series charts for building metrics."""
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -183,6 +184,21 @@ def render_time_series_chart(
         telemetry = entry.get("telemetry", {})
         grid_stress = entry.get("grid_stress", "low")
         
+        # Convert timestamp to datetime if it's not already
+        if isinstance(timestamp, datetime):
+            dt = timestamp
+        elif isinstance(timestamp, str):
+            try:
+                dt = pd.to_datetime(timestamp)
+            except:
+                # Fallback: use step as minutes offset from a base time
+                base_time = datetime.now()
+                dt = base_time - timedelta(minutes=(len(history) - step))
+        else:
+            # Fallback: use step as minutes offset from a base time
+            base_time = datetime.now()
+            dt = base_time - timedelta(minutes=(len(history) - step))
+        
         # Calculate aggregate stats
         values = []
         for bid in sorted(telemetry.keys()):
@@ -194,8 +210,7 @@ def render_time_series_chart(
             min_value = min(values)
             max_value = max(values)
             rows.append({
-                "Step": step,
-                "Time": timestamp,
+                "Timestamp": dt,
                 f"Avg {metric_selector}": avg_value,
                 f"Min {metric_selector}": min_value,
                 f"Max {metric_selector}": max_value,
@@ -207,9 +222,14 @@ def render_time_series_chart(
     
     df = pd.DataFrame(rows)
     
-    # Plot time series with avg, min, max
-    if "Step" in df.columns and f"Avg {metric_selector}" in df.columns:
-        chart_data = df.set_index("Step")[[
+    # Ensure Timestamp is datetime type
+    if "Timestamp" in df.columns:
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+        df = df.sort_values("Timestamp")
+    
+    # Plot time series with avg, min, max using Timestamp as x-axis
+    if "Timestamp" in df.columns and f"Avg {metric_selector}" in df.columns:
+        chart_data = df.set_index("Timestamp")[[
             f"Avg {metric_selector}",
             f"Min {metric_selector}",
             f"Max {metric_selector}",
@@ -230,5 +250,5 @@ def render_time_series_chart(
             with stats_inline[2]:
                 st.metric("Max", f"{df[f'Max {metric_selector}'].max():.1f}" if len(df) > 0 else "—")
     else:
-        st.warning("Data format issue. Expected 'Step' and metric columns.")
+        st.warning("Data format issue. Expected 'Timestamp' and metric columns.")
     

@@ -22,8 +22,8 @@ Once running, the dashboard displays:
 - **Git** ([Download here](https://git-scm.com/downloads))
 - **Terminal/Command Prompt** access
 
-### Optional
-- **Virtual environment tool** (recommended: `venv` or `conda`)
+### Important: Virtual Environment
+**⚠️ Using a virtual environment is strongly recommended** to avoid conflicts with system Python packages. This project uses modern dependencies that should be isolated from your system Python installation.
 
 ---
 
@@ -42,11 +42,11 @@ Replace `<your-github-repo-url>` with your actual GitHub repository URL.
 
 ---
 
-### 2. Create a Virtual Environment (Recommended)
+### 2. Create a Virtual Environment ⚠️ REQUIRED
 
-This keeps project dependencies isolated from your system Python.
+**Important:** Always use a virtual environment for this project. This keeps project dependencies isolated from your system Python and prevents conflicts.
 
-**Option A: Using venv (built-in)**
+**Option A: Using venv (Recommended - Built into Python)**
 ```bash
 # Create virtual environment
 python3 -m venv venv
@@ -64,15 +64,21 @@ conda create -n cool python=3.11
 conda activate cool
 ```
 
-You should see `(venv)` or `(cool)` in your terminal prompt when activated.
+**Verify activation:** You should see `(venv)` or `(cool)` in your terminal prompt when activated. If you don't see this, the virtual environment is not active and you should activate it before proceeding.
 
 ---
 
 ### 3. Install Dependencies
 
+**⚠️ Make sure your virtual environment is activated** (you should see `(venv)` in your prompt).
+
 Install the project and its dependencies:
 
 ```bash
+# Upgrade pip first (recommended)
+pip install --upgrade pip
+
+# Install the project and all dependencies
 pip install -e .
 ```
 
@@ -82,9 +88,13 @@ This installs:
 - **FastAPI**: API backend
 - **Plotly**: Interactive charts
 - **PyDeck**: 3D map visualization
+- **Pandas**: Data manipulation
+- **Structlog**: Structured logging
 - And more...
 
 **Installation time:** 1-3 minutes depending on your internet speed.
+
+**Note:** The dashboard uses **mock telemetry data** by default (simulated building data). Real-world data sources like CityLearn can be integrated in the future but are not required.
 
 ---
 
@@ -240,10 +250,19 @@ AI agents become more aggressive during high stress periods to support the grid.
 
 **Solution:**
 ```bash
-# Make sure you're in the virtual environment
-# Then reinstall dependencies
+# 1. Make sure you're in the virtual environment
+#    You should see (venv) in your terminal prompt
+#    If not, activate it: source venv/bin/activate
+
+# 2. Verify virtual environment is active
+which python  # Should show path to venv/bin/python
+
+# 3. Reinstall dependencies
+pip install --upgrade pip
 pip install -e .
 ```
+
+**Common mistake:** Running commands outside the virtual environment. Always activate the venv first!
 
 ---
 
@@ -264,11 +283,20 @@ streamlit run thermal_commons_mvp/dashboard/app.py --server.port 8502
 **Error:** `requires-python = ">=3.10"`
 
 **Solution:**
-- Install Python 3.10 or higher
+- Install Python 3.10 or higher from [python.org](https://www.python.org/downloads/)
 - Create a new virtual environment with the correct version:
   ```bash
-  python3.11 -m venv venv
-  source venv/bin/activate
+  # Remove old venv if it exists
+  rm -rf venv
+  
+  # Create new venv with Python 3.10+
+  python3.11 -m venv venv  # or python3.10, python3.12, etc.
+  
+  # Activate it
+  source venv/bin/activate  # On Windows: venv\Scripts\activate
+  
+  # Install dependencies
+  pip install --upgrade pip
   pip install -e .
   ```
 
@@ -425,15 +453,18 @@ If you encounter issues:
 
 - [ ] Python 3.10+ installed
 - [ ] Repository cloned
-- [ ] Virtual environment created and activated
-- [ ] Dependencies installed (`pip install -e .`)
-- [ ] `.env` file created
+- [ ] **Virtual environment created** (`python3 -m venv venv`)
+- [ ] **Virtual environment activated** (see `(venv)` in prompt)
+- [ ] **Dependencies installed** (`pip install -e .`)
+- [ ] `.env` file created (`cp .env.example .env`)
 - [ ] Dashboard launches without errors
 - [ ] Browser opens to `http://localhost:8501`
 - [ ] Map displays 50 buildings
 - [ ] Simulation starts when clicking ▶️
 - [ ] Trades appear in Agent Network
 - [ ] Carbon counter increases
+
+**Remember:** Always activate your virtual environment before running the dashboard!
 
 **All checked?** You're ready to explore the COOL dashboard! 🚀
 

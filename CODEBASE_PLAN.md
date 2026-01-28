@@ -15,7 +15,7 @@ thermal_commons_mvp/
 ├── .env.example
 ├── config/                     # Configuration & constants
 ├── models/                     # Domain models & DTOs
-├── simulation/                 # Layer 1 edge: CityLearn & grid stress
+├── simulation/                 # Layer 1 edge: mock telemetry (CityLearn optional/shelved)
 ├── interface/                  # Layer 1 edge: BACnet/BMS
 ├── agents/                     # Layer 2 swarm: MARL & market logic
 ├── market/                     # Layer 2: order matching & execution
@@ -34,7 +34,7 @@ thermal_commons_mvp/
 | File | Purpose |
 |------|--------|
 | `__init__.py` | Re-export `get_settings` |
-| `settings.py` | Pydantic `BaseSettings` from env (API port, BACnet IP, CityLearn schema path, log level) |
+| `settings.py` | Pydantic `BaseSettings` from env (API port, BACnet IP, optional CityLearn schema path, log level) |
 | `constants.py` | Literals: building IDs, default setpoints, grid stress levels, market params |
 
 ### 2.2 `models/`
@@ -51,8 +51,8 @@ thermal_commons_mvp/
 
 | File | Purpose |
 |------|--------|
-| `__init__.py` | Re-export `CityLearnGym`, `GridStressGenerator` |
-| `city_gym.py` | CityLearn wrapper: `Building_5` tropical preset, `step()` → `[temp, humidity, power_load]`, Gym-like API |
+| `__init__.py` | Re-export `CityLearnGym` (optional), `GridStressGenerator` |
+| `city_gym.py` | CityLearn wrapper (optional/shelved): `Building_5` tropical preset, `step()` → `[temp, humidity, power_load]`, Gym-like API. Falls back to mock telemetry if CityLearn not available. |
 | `grid_stress.py` | `GridStressGenerator`: produces `GridStressSignal` on a schedule or from a simple model |
 
 ### 2.4 `interface/` — *Layer 1 BMS*
@@ -67,7 +67,7 @@ thermal_commons_mvp/
 | File | Purpose |
 |------|--------|
 | `__init__.py` | Re-export `BaseAgent`, `RbcAgent`, `MarketMakerAgent`, `BidGenerator`, `AIDecisionEngine` |
-| `base_agent.py` | Abstract `BaseAgent`: `act(obs) -> action`, interface for RLlib/CityLearn |
+| `base_agent.py` | Abstract `BaseAgent`: `act(obs) -> action`, interface for RLlib/CityLearn (optional) |
 | `rbc_agent.py` | Rule-based controller: comfort vs. load, baseline stability |
 | `market_maker.py` | Market-making logic: one agent per building; `submit_orders(telemetry, grid_signal, trade_history)` |
 | `bid_generator.py` | `BidGenerator`: willingness to trade → `Bid`/`Ask`; uses `AIDecisionEngine` when `use_ai=True` |
@@ -143,7 +143,7 @@ thermal_commons_mvp/
 
 ## 5. Dependency groups (pyproject.toml)
 
-- **core**: citylearn, bac0, pydantic-settings, structlog or standard logging.
+- **core**: bac0, pydantic-settings, structlog or standard logging. (citylearn optional/shelved)
 - **agents**: ray[rllib], gymnasium.
 - **api**: fastapi, uvicorn.
 - **dashboard**: streamlit, pydeck, pandas.
@@ -156,7 +156,7 @@ thermal_commons_mvp/
 | Architecture element | Code location |
 |----------------------|---------------|
 | Layer 1 – BMS Connector (BACnet) | `interface/bacnet_driver.py` |
-| Layer 1 – Simulation (mock world) | `simulation/city_gym.py`, `simulation/grid_stress.py` |
+| Layer 1 – Simulation (mock telemetry, CityLearn optional) | `simulation/city_gym.py` (falls back to mock), `simulation/grid_stress.py` |
 | Layer 2 – Agent Grid (AI agentic backend) | `agents/base_agent.py`, `agents/market_maker.py`, `agents/bid_generator.py`, `agents/ai_decision_engine.py` |
 | Layer 2 – Order matching / trades between buildings | `market/order_book.py`; matching in `dashboard/simulation_engine._match_orders()` |
 | Layer 3 – Market Dashboard | `dashboard/app.py`, `dashboard/components/*` |

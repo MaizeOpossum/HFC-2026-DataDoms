@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "DataDoms HFC" }]
-keywords = ["energy", "bacnet", "citylearn", "marl", "streamlit"]
+keywords = ["energy", "bacnet", "marl", "streamlit"]
 
 dependencies = [
     "pydantic>=2.0",
@@ -28,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 # CityLearn pulls gymnasium<=0.28 and older deps; use a separate venv if you need it.
 simulation = [
-    "citylearn>=2.0",
+    "CityLearn>=2.0",
 ]
 agents = [
     "ray[rllib]>=2.7",

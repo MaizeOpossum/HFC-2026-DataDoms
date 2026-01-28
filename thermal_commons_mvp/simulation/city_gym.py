@@ -1,4 +1,12 @@
-"""CityLearn environment wrapper: Building_5 tropical preset, step() -> [temp, humidity, power_load]."""
+"""
+CityLearn environment wrapper (OPTIONAL).
+
+This module provides integration with CityLearn for realistic building energy simulation.
+CityLearn integration is currently shelved - the dashboard works with mock telemetry.
+
+If CityLearn is installed, this wrapper can be used to generate realistic building
+energy data. Otherwise, the simulation engine falls back to mock telemetry.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +20,7 @@ from thermal_commons_mvp.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
-# CityLearn is optional at import time for environments that only run BACnet/dashboard
+# CityLearn is optional - dashboard works without it using mock telemetry
 try:
     from citylearn.citylearn import CityLearnEnv
     from citylearn.schema import Schema
@@ -26,10 +34,13 @@ except ImportError:
 
 class CityLearnGym:
     """
-    Wrapper around CityLearn with Building_5 (tropical) preset.
+    Wrapper around CityLearn with Building_5 (tropical) preset (OPTIONAL).
 
     Exposes step() returning (temp_c, humidity_pct, power_load_kw) and optional
     Telemetry for a single building.
+
+    Note: CityLearn integration is shelved. This class falls back to mock values
+    if CityLearn is not installed. The dashboard works perfectly without CityLearn.
     """
 
     def __init__(

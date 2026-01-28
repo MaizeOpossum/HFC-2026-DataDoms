@@ -223,7 +223,6 @@ def inject_custom_css() -> None:
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
-        animation: fadeIn 0.5s ease-out;
     }
 
     /* Also ensure bare markdown wrappers never appear as empty cards/skeletons */
@@ -381,7 +380,7 @@ def inject_custom_css() -> None:
         border: 1px solid var(--primary) !important;
     }
     
-    /* Dark background for map container (only if using light fallback) */
+    /* Dark background for map container */
     div[data-testid="stPydeckChart"] {
         background-color: #0a0a1a !important;
     }
@@ -404,7 +403,7 @@ def inject_custom_js() -> None:
         `;
         document.head.appendChild(style);
         
-        // Remove ALL empty skeleton/padding boxes - hide completely so they take zero space.
+        // Remove empty skeleton/padding boxes - hide completely so they take zero space
         function collapseEmpty(el) {
             if (!el || el._skeletonRemoved) return;
             el._skeletonRemoved = true;
@@ -414,94 +413,51 @@ def inject_custom_js() -> None:
             el.style.margin = '0';
             el.style.padding = '0';
             el.style.overflow = 'hidden';
-            el.style.border = 'none';
-            el.style.background = 'transparent';
         }
+        
         function hasRealContent(node) {
             if (!node) return false;
             const real = node.querySelector(
-                'canvas,svg,img,iframe,video,table,pre,code,' +
-                'input,select,textarea,button,' +
-                '[data-testid="stMetric"],[data-testid="stDataFrame"],[data-testid="stChart"],[data-testid="stPydeckChart"],[data-testid="stMarkdown"]'
+                'canvas,svg,img,iframe,video,table,pre,code,input,select,textarea,button,' +
+                '[data-testid="stMetric"],[data-testid="stDataFrame"],[data-testid="stChart"],[data-testid="stPydeckChart"]'
             );
             if (real) return true;
             const t = (node.textContent || '').replace(/\\s+/g, ' ').trim();
             return t.length > 0;
         }
+        
         function removeSkeletonContainers() {
-            const sel = '[data-testid="stElementContainer"], [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"], [data-testid="column"]';
+            const sel = '[data-testid="stElementContainer"], [data-testid="stVerticalBlock"], [data-testid="stHorizontalBlock"]';
             document.querySelectorAll(sel).forEach((el) => {
-                if (el._skeletonRemoved) return;
-                if (hasRealContent(el)) return;
+                if (el._skeletonRemoved || hasRealContent(el)) return;
                 collapseEmpty(el);
-                ['stVerticalBlock', 'stColumn', 'stHorizontalBlock', 'stLayoutWrapper'].forEach((tid) => {
-                    const p = el.closest('[data-testid="' + tid + '"]');
-                    if (p && !p._skeletonRemoved && !hasRealContent(p)) collapseEmpty(p);
-                });
             });
         }
 
-        // Add glow effect to metrics on update
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(function(node) {
-                        if (node.nodeType === 1) {
-                            const metricValue = node.querySelector('[data-testid="stMetricValue"]');
-                            if (metricValue) {
-                                metricValue.parentElement.style.animation = 'glow 0.6s ease';
-                            }
-                        }
-                    });
-                }
-            });
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        // Run skeleton cleanup immediately and on DOM changes (Streamlit reruns)
+        // Run skeleton cleanup immediately and on DOM changes
         removeSkeletonContainers();
         const skeletonObserver = new MutationObserver(removeSkeletonContainers);
         skeletonObserver.observe(document.body, { childList: true, subtree: true });
         
-        // Add hover effects to cards
-        const cards = document.querySelectorAll('.stMetric, .element-container');
-        cards.forEach(card => {
-            card.addEventListener('mouseenter', function() {
-                this.style.transform = 'translateY(-2px)';
-                this.style.boxShadow = '0 8px 24px rgba(0, 212, 255, 0.2)';
+        // Add hover effects to metrics cards
+        function addCardHoverEffects() {
+            const cards = document.querySelectorAll('.stMetric:not([data-enhanced])');
+            cards.forEach(card => {
+                card.dataset.enhanced = 'true';
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                    this.style.boxShadow = '0 8px 24px rgba(0, 212, 255, 0.2)';
+                });
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                    this.style.boxShadow = 'none';
+                });
             });
-            card.addEventListener('mouseleave', function() {
-                this.style.transform = 'translateY(0)';
-                this.style.boxShadow = 'none';
-            });
-        });
+        }
         
-        // Update cards on new data
-        const cardObserver = new MutationObserver(function() {
-            const newCards = document.querySelectorAll('.stMetric, .element-container');
-            newCards.forEach(card => {
-                if (!card.dataset.enhanced) {
-                    card.dataset.enhanced = 'true';
-                    card.addEventListener('mouseenter', function() {
-                        this.style.transform = 'translateY(-2px)';
-                        this.style.boxShadow = '0 8px 24px rgba(0, 212, 255, 0.2)';
-                    });
-                    card.addEventListener('mouseleave', function() {
-                        this.style.transform = 'translateY(0)';
-                        this.style.boxShadow = 'none';
-                    });
-                }
-            });
-        });
-        
-        cardObserver.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        addCardHoverEffects();
+        const cardObserver = new MutationObserver(addCardHoverEffects);
+        cardObserver.observe(document.body, { childList: true, subtree: true });
     });
     </script>
     """

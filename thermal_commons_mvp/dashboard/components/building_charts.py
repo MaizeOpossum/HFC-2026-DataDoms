@@ -154,7 +154,7 @@ def render_building_bar_chart(
     })
     
     # Create bar chart - compact height for side-by-side
-    st.bar_chart(df.set_index("Building"), height=350, use_container_width=True)
+    st.bar_chart(df.set_index("Building"), height=350)
     
 def render_time_series_chart(
     history: Optional[List[Dict[str, Any]]] = None,
@@ -237,7 +237,6 @@ def render_time_series_chart(
         st.line_chart(
             chart_data,
             height=350,
-            use_container_width=True,
         )
         
         # Summary stats inline with labels

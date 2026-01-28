@@ -3,7 +3,7 @@
 import random
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from thermal_commons_mvp.agents.bid_generator import BidGenerator
 from thermal_commons_mvp.agents.market_maker import MarketMakerAgent
@@ -20,95 +20,22 @@ from thermal_commons_mvp.dashboard.event_bus import get_event_bus, TRADE_EXECUTE
 # Generate 50 building IDs: Building_01 through Building_50
 BUILDING_IDS = [f"Building_{i:02d}" for i in range(1, 51)]
 
-# CityLearn integration is optional (shelved) - dashboard works with mock telemetry
-try:
-    from thermal_commons_mvp.simulation.city_gym import CityLearnGym
-    CITYLEARN_AVAILABLE = True
-except ImportError:
-    CityLearnGym = None  # type: ignore[assignment, misc]
-    CITYLEARN_AVAILABLE = False
-
 
 def _random_telemetry(building_id: str, step: int) -> Telemetry:
-    """
-    Generate mock telemetry data for a building.
-    
-    This function creates realistic-looking telemetry values that vary over time
-    based on the building ID and simulation step. Used when CityLearn is not available.
-    """
-    # Base values vary by building ID (deterministic but different per building)
+    """Slight random walk so each building behaves differently over time."""
     base_temp = 23.5 + (hash(building_id) % 10) / 10.0
     base_humidity = 55.0 + (hash(building_id + "h") % 15)
     base_power = 45.0 + (hash(building_id + "p") % 25)
-    
-    # Use step number to create time-based variation (values change each tick)
+    # drift with step so values change each tick
     r = random.Random(step + hash(building_id))
     temp = base_temp + (r.random() - 0.5) * 2.0
     humidity = base_humidity + (r.random() - 0.5) * 10.0
     power = max(10.0, base_power + (r.random() - 0.5) * 20.0)
-    
-    # Ensure values are within valid ranges
-    temp = max(15.0, min(35.0, temp))
-    humidity = max(0.0, min(100.0, humidity))
-    power = max(10.0, power)
-    
     return Telemetry(
         building_id=building_id,
         temp_c=round(temp, 1),
         humidity_pct=round(humidity, 0),
         power_load_kw=round(power, 1),
-        timestamp=datetime.now(timezone.utc),
-    )
-
-
-def _get_citylearn_base_telemetry(citylearn_gym: Optional[Any]) -> Optional[Tuple[float, float, float]]:
-    """
-    Get base telemetry from CityLearn (call once per simulation step).
-    Returns (temp_c, humidity_pct, power_load_kw) or None if unavailable.
-    """
-    if not CITYLEARN_AVAILABLE or citylearn_gym is None:
-        return None
-    
-    try:
-        temp_c, humidity_pct, power_load_kw = citylearn_gym.step()
-        return (temp_c, humidity_pct, power_load_kw)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"CityLearn step failed: {e}, falling back to mock")
-        return None
-
-
-def _get_telemetry_from_citylearn(
-    base_telemetry: Optional[Tuple[float, float, float]],
-    building_id: str,
-    step: int,
-) -> Telemetry:
-    """
-    Get telemetry with per-building variation from CityLearn base values.
-    
-    If base_telemetry is None, falls back to mock telemetry.
-    Adds small per-building offsets to create diversity.
-    """
-    if base_telemetry is None:
-        return _random_telemetry(building_id, step)
-    
-    temp_c, humidity_pct, power_load_kw = base_telemetry
-    
-    # Add per-building variation (small offset based on building ID hash)
-    # This makes each building slightly different while sharing CityLearn dynamics
-    building_offset = (hash(building_id) % 100) / 100.0  # 0.0 to 0.99
-    
-    # Apply small variations: ±2°C temp, ±5% humidity, ±10kW power
-    temp_c = temp_c + (building_offset - 0.5) * 2.0
-    humidity_pct = humidity_pct + (building_offset - 0.5) * 5.0
-    power_load_kw = max(10.0, power_load_kw + (building_offset - 0.5) * 10.0)
-    
-    return Telemetry(
-        building_id=building_id,
-        temp_c=round(temp_c, 1),
-        humidity_pct=round(humidity_pct, 0),
-        power_load_kw=round(power_load_kw, 1),
-        timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -177,23 +104,6 @@ def make_initial_state() -> Dict[str, Any]:
     """State dict for st.session_state: telemetry, book, trades, carbon, grid, step, history."""
     settings = get_settings()
     
-    # Initialize CityLearn if available
-    citylearn_gym: Optional[Any] = None
-    if CITYLEARN_AVAILABLE and CityLearnGym is not None:
-        try:
-            citylearn_gym = CityLearnGym()
-            # Reset to get initial state
-            citylearn_gym.reset()
-            import logging
-            logging.getLogger(__name__).info("CityLearn environment initialized")
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"CityLearn initialization failed: {e}, using mock telemetry")
-            citylearn_gym = None
-    else:
-        import logging
-        logging.getLogger(__name__).info("CityLearn not available, using mock telemetry")
-    
     # Initialize database if persistence is enabled
     db = None
     if settings.enable_persistence:
@@ -201,46 +111,36 @@ def make_initial_state() -> Dict[str, Any]:
         db_path = Path(settings.db_path) if settings.db_path else None
         db = StateDatabase(db_path=db_path)
         
-        # Try to load recent trades and history
-        recent_trades = db.get_trades(limit=1000)
-        recent_history = db.get_recent_history(limit=100)
+        # Load only last 50 trades for performance (reduced from 1000)
+        recent_trades = db.get_trades(limit=50)
+        recent_history = db.get_recent_history(limit=50)
     else:
         recent_trades = []
         recent_history = []
     
-    # Generate initial telemetry (using CityLearn if available)
-    # Get base telemetry from CityLearn reset (call once)
-    base_telemetry = None
-    if citylearn_gym is not None:
-        try:
-            base_telemetry = citylearn_gym.reset()
-        except Exception:
-            base_telemetry = None
-    
-    initial_telemetry = {}
-    for b in BUILDING_IDS:
-        initial_telemetry[b] = _get_telemetry_from_citylearn(base_telemetry, b, 0)
+    # Pre-create agents once (cached for performance)
+    agents = {
+        b: MarketMakerAgent(
+            b,
+            bid_generator=BidGenerator(building_id=b, use_ai=True)
+        )
+        for b in BUILDING_IDS
+    }
     
     return {
-        "telemetry": initial_telemetry,
+        "telemetry": {b: _random_telemetry(b, 0) for b in BUILDING_IDS},
         "order_book": OrderBook(),
         "trades": recent_trades,
         "total_kwh_saved": sum(t.quantity_kwh for t in recent_trades) if recent_trades else 0.0,
         "grid_stress": "low",
         "step_count": recent_history[-1]["step"] if recent_history else 0,
         "grid_gen": GridStressGenerator(cycle_minutes=settings.grid_cycle_minutes),
-        "citylearn_gym": citylearn_gym,  # Store CityLearn instance in state
-        "agents": {
-            b: MarketMakerAgent(
-                b,
-                bid_generator=BidGenerator(building_id=b, use_ai=True)
-            )
-            for b in BUILDING_IDS
-        },
+        "agents": agents,  # Reuse agents across steps for performance
         "history": recent_history,  # Store historical data for time series
-        "max_history": 100,  # Keep last 100 steps
+        "max_history": 50,  # Reduced from 100 for performance
         "bid_to_building": {},  # Mapping bid_id -> building_id
         "ask_to_building": {},  # Mapping ask_id -> building_id
+        "new_trades": [],  # New trades from current cycle
         "db": db,  # Database instance for persistence
     }
 
@@ -271,20 +171,16 @@ def step(state: Dict[str, Any]) -> None:
     state["order_book"] = book
     telemetry: Dict[str, Telemetry] = {}
 
-    # Pass trade history to agents for AI learning
-    recent_trades = state.get("trades", [])[-20:]  # Last 20 trades for context
+    # Pass only last 10 trades for context (reduced from 20 for performance)
+    recent_trades = state.get("trades", [])[-10:]
     ai_reasoning: Dict[str, str] = {}
     
     # Track bid_id/ask_id -> building_id mapping for trade display
-    bid_to_building: Dict[str, str] = state.get("bid_to_building", {})
-    ask_to_building: Dict[str, str] = state.get("ask_to_building", {})
-    
-    # Get CityLearn gym from state (if available) and step once per simulation tick
-    citylearn_gym = state.get("citylearn_gym")
-    base_telemetry = _get_citylearn_base_telemetry(citylearn_gym)
+    bid_to_building: Dict[str, str] = {}
+    ask_to_building: Dict[str, str] = {}
     
     for b in BUILDING_IDS:
-        t = _get_telemetry_from_citylearn(base_telemetry, b, step_n)
+        t = _random_telemetry(b, step_n)
         telemetry[b] = t
         bid_order, ask_order = agents[b].submit_orders(t, grid_signal, trade_history=recent_trades)
         book.add_bid(bid_order)
@@ -304,35 +200,40 @@ def step(state: Dict[str, Any]) -> None:
 
     state["telemetry"] = telemetry
     new_trades = _match_orders(book)
-    state["trades"] = state.get("trades", []) + new_trades
+    
+    # Keep only last 100 trades in memory (prevent unbounded growth)
+    all_trades = state.get("trades", []) + new_trades
+    state["trades"] = all_trades[-100:]
+    state["new_trades"] = new_trades  # Store new trades for this cycle
     state["total_kwh_saved"] = state.get("total_kwh_saved", 0.0) + sum(t.quantity_kwh for t in new_trades)
 
-    # Publish trade_executed for each new trade (event_bus → WebSocket / real-time clients)
-    bus = get_event_bus()
-    for t in new_trades:
-        seller_bid = ask_to_building.get(t.ask_id, "")
-        buyer_bid = bid_to_building.get(t.bid_id, "")
-        bus.publish(TRADE_EXECUTED, {
-            "trade_id": t.id,
-            "bid_id": t.bid_id,
-            "ask_id": t.ask_id,
-            "quantity_kwh": t.quantity_kwh,
-            "price_per_kwh": t.price_per_kwh,
-            "executed_at": t.executed_at.isoformat() if t.executed_at else None,
-            "seller_building_id": seller_bid,
-            "buyer_building_id": buyer_bid,
-            "agent_reasoning_seller": ai_reasoning.get(seller_bid),
-            "agent_reasoning_buyer": ai_reasoning.get(buyer_bid),
-        })
+    # Only publish events if there are new trades (optimization)
+    if new_trades:
+        bus = get_event_bus()
+        for t in new_trades:
+            seller_bid = ask_to_building.get(t.ask_id, "")
+            buyer_bid = bid_to_building.get(t.bid_id, "")
+            bus.publish(TRADE_EXECUTED, {
+                "trade_id": t.id,
+                "bid_id": t.bid_id,
+                "ask_id": t.ask_id,
+                "quantity_kwh": t.quantity_kwh,
+                "price_per_kwh": t.price_per_kwh,
+                "executed_at": t.executed_at.isoformat() if t.executed_at else None,
+                "seller_building_id": seller_bid,
+                "buyer_building_id": buyer_bid,
+                "agent_reasoning_seller": ai_reasoning.get(seller_bid),
+                "agent_reasoning_buyer": ai_reasoning.get(buyer_bid),
+            })
 
-    # Persist trades to database if enabled
-    db = state.get("db")
-    if db and new_trades:
-        try:
-            db.save_trades(new_trades)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to persist trades: {e}")
+        # Persist trades to database only if enabled and there are new trades
+        db = state.get("db")
+        if db:
+            try:
+                db.save_trades(new_trades)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to persist trades: {e}")
     
     # Store historical snapshot for time series
     history = state.get("history", [])
@@ -344,11 +245,12 @@ def step(state: Dict[str, Any]) -> None:
     }
     history.append(history_entry)
     # Keep only last N steps
-    max_history = state.get("max_history", 100)
+    max_history = state.get("max_history", 50)
     state["history"] = history[-max_history:]
     
-    # Persist history snapshot to database if enabled
-    if db:
+    # Persist history snapshot less frequently (every 5 steps) for performance
+    db = state.get("db")
+    if db and step_n % 5 == 0:
         try:
             db.save_history_snapshot(
                 step=step_n,

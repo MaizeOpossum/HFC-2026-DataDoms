@@ -20,7 +20,11 @@ def render_agent_network(
     ask_to_building: Optional[Dict[str, str]] = None,
     key: Optional[str] = None,
 ) -> None:
-    """Render energy-flow strips: seller (left) → moving energy bolt → buyer (right)."""
+    """Render energy-flow strips: seller (left) → moving energy bolt → buyer (right).
+    
+    Maintains a history of transfers. New transfers appear at the top and push old ones down.
+    Once the box is full (8 rows), the oldest transfer is removed.
+    """
     st.markdown("### ⚡ Energy in transit")
 
     network_viz_container = st.empty()
@@ -31,17 +35,18 @@ def render_agent_network(
     building_list = sorted(SINGAPORE_BUILDING_LOCATIONS.keys())
     building_to_index = {b: i for i, b in enumerate(building_list)}
 
-    # Build recent strip data (last N trades) and mark which are new
-    if "displayed_trades" not in st.session_state:
-        st.session_state["displayed_trades"] = set()
-
-    strip_trades: List[Dict[str, Any]] = []
-    new_trade_keys: List[str] = []
-    seen_keys = set()
+    # Initialize persistent trade history in session state
+    if "trade_history" not in st.session_state:
+        st.session_state["trade_history"] = []  # List of {trade_data, is_new} dicts
+    
+    if "trade_history_keys" not in st.session_state:
+        st.session_state["trade_history_keys"] = set()
 
     def _t(t, key, default=None):
         return t.get(key, default) if isinstance(t, dict) else getattr(t, key, default)
 
+    # Process new trades and add to history
+    new_trades_to_add = []
     for trade in reversed(trades[-MAX_STRIPS * 3:]):
         bid_id = _t(trade, "bid_id")
         ask_id = _t(trade, "ask_id")
@@ -56,26 +61,42 @@ def render_agent_network(
 
         exec_at = _t(trade, "executed_at")
         trade_key = f"{bid_id}_{ask_id}_{exec_at if exec_at is not None else id(trade)}"
-        if trade_key in seen_keys:
-            continue
-        seen_keys.add(trade_key)
-
-        qty = _t(trade, "quantity_kwh", 0.0) or 0.0
-        price = _t(trade, "price_per_kwh", 0.0) or 0.0
-        strip_trades.append({
-            "tradeKey": trade_key,
-            "sellerId": seller_id,
-            "buyerId": buyer_id,
-            "sellerName": BUILDING_NAMES.get(seller_id, seller_id),
-            "buyerName": BUILDING_NAMES.get(buyer_id, buyer_id),
-            "quantity": round(qty, 2),
-            "pricePerKwh": round(price, 2),
-        })
-        if trade_key not in st.session_state["displayed_trades"]:
-            st.session_state["displayed_trades"].add(trade_key)
-            new_trade_keys.append(trade_key)
-
-    strip_trades = strip_trades[:MAX_STRIPS]
+        
+        # Only add if we haven't seen this trade before
+        if trade_key not in st.session_state["trade_history_keys"]:
+            qty = _t(trade, "quantity_kwh", 0.0) or 0.0
+            price = _t(trade, "price_per_kwh", 0.0) or 0.0
+            new_trades_to_add.append({
+                "tradeKey": trade_key,
+                "sellerId": seller_id,
+                "buyerId": buyer_id,
+                "sellerName": BUILDING_NAMES.get(seller_id, seller_id),
+                "buyerName": BUILDING_NAMES.get(buyer_id, buyer_id),
+                "quantity": round(qty, 2),
+                "pricePerKwh": round(price, 2),
+                "isNew": True,
+            })
+            st.session_state["trade_history_keys"].add(trade_key)
+    
+    # Add new trades to the beginning of history (newest first)
+    if new_trades_to_add:
+        # Mark all existing trades as no longer new
+        for trade in st.session_state["trade_history"]:
+            trade["isNew"] = False
+        
+        # Add new trades at the beginning
+        st.session_state["trade_history"] = new_trades_to_add + st.session_state["trade_history"]
+        
+        # Keep only the last MAX_STRIPS trades
+        st.session_state["trade_history"] = st.session_state["trade_history"][:MAX_STRIPS]
+        
+        # Update the keys set to match the kept trades
+        kept_keys = {t["tradeKey"] for t in st.session_state["trade_history"]}
+        st.session_state["trade_history_keys"] = kept_keys
+    
+    # Get the current trade history for display
+    strip_trades = st.session_state["trade_history"]
+    new_trade_keys = [t["tradeKey"] for t in strip_trades if t.get("isNew", False)]
 
     strips_json = json.dumps(strip_trades)
     new_keys_json = json.dumps(new_trade_keys)
@@ -107,6 +128,12 @@ def render_agent_network(
                 background: rgba(255,255,255,0.03);
                 border: 1px solid rgba(255,255,255,0.06);
                 position: relative;
+                transition: opacity 0.3s ease, background 0.3s ease;
+            }}
+            .flow-strip.completed {{
+                opacity: 0.6;
+                background: rgba(255,255,255,0.015);
+                border: 1px solid rgba(255,255,255,0.03);
             }}
             .pill {{
                 flex-shrink: 0;
@@ -281,6 +308,7 @@ def render_agent_network(
                     const trackWidth = trackWrap.offsetWidth || 200;
 
                     if (isNew) {{
+                        // New trade: animate the bolt
                         bolt.classList.add('animating');
                         bolt.style.left = '0%';
                         let started = null;
@@ -291,6 +319,8 @@ def render_agent_network(
                                 bolt.classList.remove('animating');
                                 bolt.classList.add('delivered');
                                 bolt.style.left = '100%';
+                                // Mark the strip as completed
+                                strip.classList.add('completed');
                                 return;
                             }}
                             let p = Math.min(1, elapsed / DURATION_MS);
@@ -299,8 +329,10 @@ def render_agent_network(
                         }}
                         requestAnimationFrame(run);
                     }} else {{
+                        // Historical trade: show as completed
                         bolt.classList.add('delivered');
                         bolt.style.left = '100%';
+                        strip.classList.add('completed');
                     }}
                 }});
             }})();
@@ -309,13 +341,18 @@ def render_agent_network(
     </html>
     """
 
-    h = max(260, min(520, 72 + len(strip_trades) * 64)) if strip_trades else 220
+    # Fixed height to accommodate all 8 rows
+    h = 520 if strip_trades else 220
     with network_viz_container.container():
         st.components.v1.html(html_content, height=h)
-
-    new_count = len(new_trade_keys)
-    total = len(st.session_state.get("displayed_trades", set()))
-    st.caption(
-        f"⚡ Energy flows: seller → buyer. "
-        f"{new_count} new this cycle • {total} total shown."
-    )
+    
+    # Show caption about history
+    if strip_trades:
+        active_count = len([t for t in strip_trades if t.get("isNew", False)])
+        completed_count = len(strip_trades) - active_count
+        if active_count > 0 and completed_count > 0:
+            st.caption(f"⚡ {active_count} active transfer(s) • 📋 {completed_count} completed (showing last {MAX_STRIPS})")
+        elif active_count > 0:
+            st.caption(f"⚡ {active_count} active transfer(s)")
+        else:
+            st.caption(f"📋 Showing last {len(strip_trades)} completed transfer(s) (max {MAX_STRIPS})")

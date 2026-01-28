@@ -35,14 +35,25 @@ settings = get_settings()
 REFRESH_SECONDS = settings.dashboard_refresh_seconds
 
 
-@st.fragment(run_every=REFRESH_SECONDS)
 def live_simulation():
-    """Run one simulation step and render gauges, trade log, carbon, map."""
+    """Run one simulation step and render components."""
     if SIM_KEY not in st.session_state:
         st.session_state[SIM_KEY] = make_initial_state()
+    
+    # Auto-refresh using session state timer
+    if "last_update" not in st.session_state:
+        st.session_state.last_update = 0
+    
+    import time
+    current_time = time.time()
+    
+    # Run simulation step if enough time has passed
     sim = st.session_state[SIM_KEY]
-    step(sim)
-
+    if current_time - st.session_state.last_update >= REFRESH_SECONDS:
+        step(sim)
+        st.session_state.last_update = current_time
+    
+    # Render all components directly (no fragment decorator = no fading)
     render_carbon_counter(total_kwh_saved=sim.get("total_kwh_saved"))
     
     # Charts side by side - grouped with their controls
@@ -60,7 +71,6 @@ def live_simulation():
         )
 
     # Singapore district map: buildings colored by temperature / power / grid stress
-    # Place immediately under the main data (carbon + charts)
     render_district_map(
         telemetry_by_building=sim.get("telemetry"),
         grid_stress=sim.get("grid_stress"),
@@ -76,6 +86,10 @@ def live_simulation():
         ask_to_building=sim.get("ask_to_building", {}),
         key="agent_network",
     )
+    
+    # Auto-rerun to keep simulation running (with small sleep to avoid CPU spike)
+    time.sleep(0.5)
+    st.rerun()
 
 
 def main() -> None:

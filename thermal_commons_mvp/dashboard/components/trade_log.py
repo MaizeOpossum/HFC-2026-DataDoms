@@ -50,7 +50,6 @@ def render_trade_log(
         # Display table with fixed height and overflow
         st.dataframe(
             df,
-            use_container_width=True,
             hide_index=True,
             height=400,  # Fixed height to prevent page stretching
         )
@@ -64,5 +63,5 @@ def render_trade_log(
             "Quantity": ["—"],
             "Price": ["—"],
         })
-        st.dataframe(empty_df, use_container_width=True, hide_index=True, height=100)
+        st.dataframe(empty_df, hide_index=True, height=100)
         st.caption("Waiting for trades...")

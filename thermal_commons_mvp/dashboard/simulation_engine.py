@@ -30,20 +30,34 @@ except ImportError:
 
 
 def _random_telemetry(building_id: str, step: int) -> Telemetry:
-    """Fallback: slight random walk so each building behaves differently over time."""
+    """
+    Generate mock telemetry data for a building.
+    
+    This function creates realistic-looking telemetry values that vary over time
+    based on the building ID and simulation step. Used when CityLearn is not available.
+    """
+    # Base values vary by building ID (deterministic but different per building)
     base_temp = 23.5 + (hash(building_id) % 10) / 10.0
     base_humidity = 55.0 + (hash(building_id + "h") % 15)
     base_power = 45.0 + (hash(building_id + "p") % 25)
-    # drift with step so values change each tick
+    
+    # Use step number to create time-based variation (values change each tick)
     r = random.Random(step + hash(building_id))
     temp = base_temp + (r.random() - 0.5) * 2.0
     humidity = base_humidity + (r.random() - 0.5) * 10.0
     power = max(10.0, base_power + (r.random() - 0.5) * 20.0)
+    
+    # Ensure values are within valid ranges
+    temp = max(15.0, min(35.0, temp))
+    humidity = max(0.0, min(100.0, humidity))
+    power = max(10.0, power)
+    
     return Telemetry(
         building_id=building_id,
         temp_c=round(temp, 1),
         humidity_pct=round(humidity, 0),
         power_load_kw=round(power, 1),
+        timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -94,6 +108,7 @@ def _get_telemetry_from_citylearn(
         temp_c=round(temp_c, 1),
         humidity_pct=round(humidity_pct, 0),
         power_load_kw=round(power_load_kw, 1),
+        timestamp=datetime.now(timezone.utc),
     )
 
 

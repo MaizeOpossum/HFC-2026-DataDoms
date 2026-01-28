@@ -5,7 +5,7 @@
 **Mission:** Deploy a decentralised agentic cooling swarm for Singapore commercial buildings.  
 **Target metric:** Maximise Carbon ROI via inter-building energy trading.
 
-This repo implements a **clean, modern dashboard** and an **AI agentic backend** that handles trades between buildings.  
+This repo implements a dashboard and an AI agentic backend that handles trades between buildings.  
 **Canonical planning:** [`architecture.json`](architecture.json) and [`DASHBOARD_AND_AGENTS_PLAN.md`](DASHBOARD_AND_AGENTS_PLAN.md). Codebase layout: [`CODEBASE_PLAN.md`](CODEBASE_PLAN.md).
 
 ## Structure

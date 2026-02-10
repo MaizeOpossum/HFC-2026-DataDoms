@@ -1,6 +1,7 @@
 """Streamlit entrypoint: Carbon Counter, charts, district map, Energy in transit."""
 
 import sys
+import time
 from pathlib import Path
 
 # Ensure project root is on the path when run via: streamlit run thermal_commons_mvp/dashboard/app.py
@@ -43,8 +44,7 @@ def live_simulation():
     # Auto-refresh using session state timer
     if "last_update" not in st.session_state:
         st.session_state.last_update = 0
-    
-    import time
+
     current_time = time.time()
     
     # Run simulation step if enough time has passed

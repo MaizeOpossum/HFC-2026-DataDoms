@@ -1,12 +1,12 @@
 """FastAPI app: async handling of sensor streams and market endpoints."""
 
 from contextlib import asynccontextmanager
-from typing import Any, List
+from typing import Any
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from thermal_commons_mvp.api.dependencies import get_driver, get_order_book, get_trade_execution
+from thermal_commons_mvp.api.dependencies import get_driver, get_trade_execution
 from thermal_commons_mvp.api.middleware import RateLimitMiddleware
 from thermal_commons_mvp.api.routes import market, telemetry
 from thermal_commons_mvp.config import get_settings
@@ -79,6 +79,6 @@ def favicon() -> Response:
 
 def main() -> None:
     import uvicorn
-    from thermal_commons_mvp.config import get_settings
+
     s = get_settings()
     uvicorn.run("thermal_commons_mvp.api.main:app", host=s.api_host, port=s.api_port, reload=True)

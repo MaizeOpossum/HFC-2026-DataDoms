@@ -7,8 +7,6 @@ from typing import Callable
 from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from thermal_commons_mvp.config import get_settings
-
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Simple in-memory rate limiting middleware."""

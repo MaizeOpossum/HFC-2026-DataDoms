@@ -97,14 +97,12 @@ thermal_commons_mvp/
 | File | Purpose |
 |------|--------|
 | `__init__.py` | — |
-| `app.py` | Streamlit entrypoint: layout, `@st.fragment(run_every=REFRESH_SECONDS)`; carbon, charts, map, agent network, trade log |
+| `app.py` | Streamlit entrypoint: layout; carbon, charts, map, agent network (energy in transit) |
 | `simulation_engine.py` | Simulation orchestration: telemetry, 50 agents, order book, matching, trades, carbon; publishes `trade_executed` to event_bus |
 | `event_bus.py` | In-process pub/sub: `subscribe(topic, callback)`, `publish(topic, payload)`; topics: `trade_executed`, `telemetry_updated`, `grid_stress_changed` |
 | `websocket_server.py` | Standalone FastAPI app: runs simulation in a thread, subscribes to event_bus, broadcasts trade events to WebSocket clients at `/ws/trades` |
 | `components/` | |
-| `components/gauges.py` | Live gauges for temp, humidity, power, grid stress |
 | `components/carbon_counter.py` | Carbon Counter: aggregate real-time savings from trades |
-| `components/trade_log.py` | Trade log table / feed |
 | `components/district_map.py` | Static PyDeck district map; building points at real locations |
 | `components/agent_network.py` | Agent Network: ring of building nodes, animated points for trades (seller→buyer), labels on click |
 | `components/building_charts.py` | Building bar chart and time-series chart |

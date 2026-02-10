@@ -19,7 +19,7 @@ thermal_commons_mvp/
 ├── agents/         # BaseAgent, MarketMaker, BidGenerator, AIDecisionEngine
 ├── market/         # OrderBook (matching in simulation_engine)
 ├── api/            # FastAPI: telemetry & market routes
-├── dashboard/      # Streamlit app, simulation_engine, event_bus, websocket_server; carbon, charts, map, Agent Network, trade log
+├── dashboard/      # Streamlit app, simulation_engine, event_bus, websocket_server; carbon, charts, map, Agent Network
 └── utils/          # CarbonCalculator, logging
 tests/
 ├── unit/

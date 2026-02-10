@@ -8,14 +8,9 @@ from thermal_commons_mvp.interface.bacnet_driver import BAC0Driver, BACnetDriver
 from thermal_commons_mvp.market.order_book import OrderBook
 from thermal_commons_mvp.market.trade_execution import TradeExecution
 
-_settings = None
 _driver: Optional[BACnetDriver] = None
 _order_book: Optional[OrderBook] = None
 _trade_execution: Optional[TradeExecution] = None
-
-
-def get_settings_dep():
-    return get_settings()
 
 
 def get_driver() -> BACnetDriver:

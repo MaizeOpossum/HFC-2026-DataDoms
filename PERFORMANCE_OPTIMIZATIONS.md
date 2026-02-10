@@ -138,7 +138,6 @@ Streamlit deprecated `use_container_width` parameter in favor of `width` paramet
 Removed all `use_container_width=True` parameters from:
 - `district_map.py`
 - `building_charts.py` (2 occurrences)
-- `trade_log.py` (2 occurrences)
 
 **Impact**: Cleaner console output, future-proof code
 

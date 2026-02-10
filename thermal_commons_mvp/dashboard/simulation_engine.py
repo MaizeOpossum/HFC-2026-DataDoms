@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from thermal_commons_mvp.agents.bid_generator import BidGenerator
+from thermal_commons_mvp.utils.logging_utils import get_logger
 from thermal_commons_mvp.agents.market_maker import MarketMakerAgent
 from thermal_commons_mvp.config import get_settings
 from thermal_commons_mvp.market.order_book import OrderBook
@@ -16,6 +17,8 @@ from thermal_commons_mvp.persistence.database import StateDatabase
 from thermal_commons_mvp.simulation.grid_stress import GridStressGenerator
 
 from thermal_commons_mvp.dashboard.event_bus import get_event_bus, TRADE_EXECUTED
+
+logger = get_logger(__name__)
 
 # Generate 50 building IDs: Building_01 through Building_50
 BUILDING_IDS = [f"Building_{i:02d}" for i in range(1, 51)]
@@ -232,8 +235,7 @@ def step(state: Dict[str, Any]) -> None:
             try:
                 db.save_trades(new_trades)
             except Exception as e:
-                import logging
-                logging.getLogger(__name__).warning(f"Failed to persist trades: {e}")
+                logger.warning("Failed to persist trades: %s", e)
     
     # Store historical snapshot for time series
     history = state.get("history", [])
@@ -260,5 +262,4 @@ def step(state: Dict[str, Any]) -> None:
                 total_kwh_saved=state["total_kwh_saved"],
             )
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Failed to persist history snapshot: {e}")
+            logger.warning("Failed to persist history snapshot: %s", e)
